@@ -3,7 +3,7 @@ services:
     name: wikidata-mcp-server
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python server_sse.py
+    startCommand: python fastapi_server.py
     envVars:
       - key: PORT
         value: 10000

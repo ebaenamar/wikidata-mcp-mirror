@@ -1,1 +1,1 @@
-web: python server_sse.py
+web: python fastapi_server.py
