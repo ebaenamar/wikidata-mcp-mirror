@@ -375,7 +375,10 @@ async def handle_sse(request):
 routes = [
     Route("/", endpoint=lambda request: Response("Wikidata MCP Server is running. Use /sse for MCP connections.")),
     Route("/sse", endpoint=handle_sse, methods=["GET"]),
+    # Ensure the messages endpoint accepts OPTIONS requests
     Mount("/messages", app=sse_transport.handle_post_message),
+    # Add a direct handler for OPTIONS requests to /messages
+    Route("/messages", endpoint=lambda request: Response("POST to /messages/{session_id} for MCP communication"), methods=["OPTIONS"]),
 ]
 
 # Create the ASGI application
