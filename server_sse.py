@@ -359,7 +359,7 @@ Follow these steps:
 
 # ============= CREATE SSE APP =============
 
-# Create an SSE transport
+# Create an SSE transport with the correct path
 sse_transport = SseServerTransport("/messages")
 
 # Define SSE handler
@@ -371,8 +371,9 @@ async def handle_sse(request):
     # Return empty response to avoid NoneType error
     return Response()
 
-# Create Starlette routes
+# Create Starlette routes - make sure the root path is handled
 routes = [
+    Route("/", endpoint=lambda request: Response("Wikidata MCP Server is running. Use /sse for MCP connections.")),
     Route("/sse", endpoint=handle_sse, methods=["GET"]),
     Mount("/messages", app=sse_transport.handle_post_message),
 ]
