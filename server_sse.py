@@ -361,6 +361,10 @@ app = create_sse_app(mcp)
 
 # ============= SERVER EXECUTION =============
 
+# For Render deployment - this is the entry point
 if __name__ == "__main__":
     print("Starting Wikidata MCP Server with SSE transport...")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=port)

@@ -98,13 +98,65 @@ Then deploy using the Vercel CLI:
 vercel
 ```
 
+## Deployment on Render
+
+To deploy this MCP server with SSE transport on Render, follow these steps:
+
+1. Create a Render account if you don't have one.
+
+2. From the Render dashboard, click "New" and select "Web Service".
+
+3. Connect your GitHub repository (https://github.com/ebaenamar/wikidata-mcp) or upload the code directly.
+
+4. Configure the service with the following parameters:
+   - **Name**: wikidata-mcp-server (or the name you prefer)
+   - **Environment**: Python
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `gunicorn -k uvicorn.workers.UvicornWorker server_sse:app`
+
+5. Click "Create Web Service" and wait for the deployment to complete.
+
+6. Once deployed, Render will provide a URL (e.g., `https://wikidata-mcp-server.onrender.com`).
+
+7. To use this server with Claude or any other MCP client, configure the server URL as:
+   ```
+   https://your-app.onrender.com/sse
+   ```
+
 ## Integration with NANDA
 
-This SSE version of the Wikidata MCP server can be integrated with the NANDA (Networked Agents And Decentralized AI) ecosystem:
+To register this server in the NANDA ecosystem, you can use the `nanda_register.py` script included:
 
-1. Deploy the server to a publicly accessible URL
-2. Register the server in the [NANDA Registry](https://ui.nanda-registry.com)
-3. Other agents in the NANDA ecosystem can then discover and use your Wikidata knowledge server
+```bash
+python nanda_register.py --url https://your-app.onrender.com/sse --name "Wikidata Knowledge Server"
+```
+
+## Integration with Claude Desktop
+
+To configure Claude Desktop to use this remote MCP server:
+
+1. Edit the Claude Desktop configuration file:
+   ```
+   ~/Library/Application Support/Claude/claude_desktop_config.json
+   ```
+
+2. Update the configuration to use the remote server:
+   ```json
+   {
+     "mcpCommand": "npx",
+     "mcpArgs": ["mcp-remote", "https://your-app.onrender.com/sse"]
+   }
+   ```
+
+3. Restart Claude Desktop to apply the changes.
+
+## Testing
+
+Once configured, you can test the server with Claude using prompts like:
+
+- "¿Quién es Marie Curie según Wikidata?"
+- "¿Cuáles son las propiedades principales de la Luna en Wikidata?"
+- "Ejecuta una consulta SPARQL para encontrar los 5 ríos más largos del mundo."
 
 ## Differences from stdio Version
 

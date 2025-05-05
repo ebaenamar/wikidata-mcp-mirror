@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: wikidata-mcp-server
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server_sse.py
+    envVars:
+      - key: PORT
+        value: 10000
+    autoDeploy: true
