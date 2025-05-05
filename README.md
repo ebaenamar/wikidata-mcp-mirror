@@ -71,7 +71,74 @@ The server provides the following resources:
 1. `wikidata://common-properties`: A list of commonly used Wikidata properties
 2. `wikidata://sparql-examples`: Example SPARQL queries for common Wikidata tasks
 
-## Deployment on Vercel
+## Deployment
+
+### Railway Deployment
+
+Railway es una plataforma de despliegue que maneja bien las conexiones persistentes necesarias para servidores MCP con SSE. Sigue estos pasos para desplegar el servidor en Railway:
+
+1. **Crear una cuenta en Railway**
+   - Regístrate en [Railway](https://railway.app/)
+   - Instala la CLI de Railway: `npm install -g @railway/cli`
+   - Inicia sesión: `railway login`
+
+2. **Inicializar el proyecto en Railway**
+   ```bash
+   cd wikidata-mcp-server-sse
+   railway init
+   ```
+
+3. **Desplegar el proyecto**
+   ```bash
+   railway up
+   ```
+
+4. **Configurar variables de entorno (opcional)**
+   - Desde el dashboard de Railway, ve a tu proyecto
+   - Haz clic en "Variables"
+   - Añade cualquier variable de entorno necesaria
+
+5. **Obtener la URL del servidor**
+   - Una vez desplegado, Railway proporcionará una URL para tu aplicación
+   - Usa esta URL con el formato `https://tu-app.railway.app/sse/` en la configuración de Claude Desktop
+
+### Configuración de Claude Desktop
+
+Para usar el servidor MCP desplegado en Railway con Claude Desktop:
+
+1. Edita el archivo de configuración de Claude Desktop:
+   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+2. Añade la configuración del servidor remoto:
+   ```json
+   {
+     "mcpServers": {
+       "Wikidata Knowledge Remote": {
+         "command": "npx",
+         "args": [
+           "mcp-remote",
+           "https://tu-app.railway.app/sse/"
+         ]
+       }
+     }
+   }
+   ```
+
+3. Reinicia Claude Desktop y selecciona "Wikidata Knowledge Remote" en el menú de servidores MCP.
+
+### Render Deployment
+
+También puedes desplegar el servidor en Render, aunque puede haber limitaciones con las conexiones SSE en el plan gratuito:
+
+1. Crea una cuenta en [Render](https://render.com/)
+2. Conecta tu repositorio de GitHub
+3. Crea un nuevo Web Service
+4. Configura el servicio:
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `python server_sse.py`
+
+### Vercel Deployment
 
 This SSE version can be deployed on Vercel. Create a `vercel.json` file with the following content:
 
@@ -97,31 +164,6 @@ Then deploy using the Vercel CLI:
 ```bash
 vercel
 ```
-
-## Deployment on Render
-
-To deploy this MCP server with SSE transport on Render, follow these steps:
-
-1. Create a Render account if you don't have one.
-
-2. From the Render dashboard, click "New" and select "Web Service".
-
-3. Connect your GitHub repository (https://github.com/ebaenamar/wikidata-mcp) or upload the code directly.
-
-4. Configure the service with the following parameters:
-   - **Name**: wikidata-mcp-server (or the name you prefer)
-   - **Environment**: Python
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn -k uvicorn.workers.UvicornWorker server_sse:app`
-
-5. Click "Create Web Service" and wait for the deployment to complete.
-
-6. Once deployed, Render will provide a URL (e.g., `https://wikidata-mcp-server.onrender.com`).
-
-7. To use this server with Claude or any other MCP client, configure the server URL as:
-   ```
-   https://your-app.onrender.com/sse
-   ```
 
 ## Integration with NANDA
 

@@ -399,9 +399,15 @@ app.mount("/messages", sse_transport.handle_post_message)
 
 # ============= SERVER EXECUTION =============
 
-# For Render deployment - this is the entry point
 if __name__ == "__main__":
     print("Starting Wikidata MCP Server with SSE transport...")
-    import os
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    
+    # Configure uvicorn with longer timeouts for Railway
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=port,
+        timeout_keep_alive=120,  # Increase keep-alive timeout to 2 minutes
+        log_level="info"
+    )
