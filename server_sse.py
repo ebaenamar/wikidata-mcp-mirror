@@ -11,9 +11,9 @@ from typing import Optional, List, Dict, Any
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.prompts import base
 import uvicorn
-from starlette.applications import Starlette
+from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.routing import Route, Mount
-from starlette.responses import Response
 from mcp.server.sse import SseServerTransport
 
 from wikidata_api import (
@@ -363,7 +363,7 @@ Follow these steps:
 sse_transport = SseServerTransport("/messages")
 
 # Define SSE handler
-async def handle_sse(request):
+async def handle_sse(request: Request):
     async with sse_transport.connect_sse(
         request.scope, request.receive, request._send
     ) as streams:
@@ -371,18 +371,27 @@ async def handle_sse(request):
     # Return empty response to avoid NoneType error
     return Response()
 
-# Create Starlette routes - make sure the root path is handled
-routes = [
-    Route("/", endpoint=lambda request: Response("Wikidata MCP Server is running. Use /sse for MCP connections.")),
-    Route("/sse", endpoint=handle_sse, methods=["GET"]),
-    # Ensure the messages endpoint accepts OPTIONS requests
-    Mount("/messages", app=sse_transport.handle_post_message),
-    # Add a direct handler for OPTIONS requests to /messages
-    Route("/messages", endpoint=lambda request: Response("POST to /messages/{session_id} for MCP communication"), methods=["OPTIONS"]),
-]
+# Create FastAPI routes - make sure the root path is handled
+app = FastAPI()
 
-# Create the ASGI application
-app = Starlette(routes=routes)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+async def root():
+    return Response(content="Wikidata MCP Server is running. Use /sse for MCP connections.")
+
+@app.get("/sse")
+async def sse(request: Request):
+    return await handle_sse(request)
+
+# Mount the messages endpoint directly
+app.mount("/messages", sse_transport.handle_post_message)
 
 # ============= SERVER EXECUTION =============
 
