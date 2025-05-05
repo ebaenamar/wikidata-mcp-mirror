@@ -1,0 +1,15 @@
+{
+  "builds": [
+    {
+      "src": "server_sse.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "server_sse.py"
+    }
+  ],
+  "installCommand": "pip install -r requirements.txt --legacy-peer-deps"
+}
