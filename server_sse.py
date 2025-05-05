@@ -10,8 +10,11 @@ from typing import Optional, List, Dict, Any
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.prompts import base
-from mcp.server.sse import create_sse_app
 import uvicorn
+from starlette.applications import Starlette
+from starlette.routing import Route, Mount
+from starlette.responses import Response
+from mcp.server.sse import SseServerTransport
 
 from wikidata_api import (
     search_entity,
@@ -356,8 +359,26 @@ Follow these steps:
 
 # ============= CREATE SSE APP =============
 
-# Create an ASGI application with SSE support
-app = create_sse_app(mcp)
+# Create an SSE transport
+sse_transport = SseServerTransport("/messages")
+
+# Define SSE handler
+async def handle_sse(request):
+    async with sse_transport.connect_sse(
+        request.scope, request.receive, request._send
+    ) as streams:
+        await mcp.connect(streams[0], streams[1])
+    # Return empty response to avoid NoneType error
+    return Response()
+
+# Create Starlette routes
+routes = [
+    Route("/sse", endpoint=handle_sse, methods=["GET"]),
+    Mount("/messages", app=sse_transport.handle_post_message),
+]
+
+# Create the ASGI application
+app = Starlette(routes=routes)
 
 # ============= SERVER EXECUTION =============
 
@@ -366,5 +387,4 @@ if __name__ == "__main__":
     print("Starting Wikidata MCP Server with SSE transport...")
     import os
     port = int(os.environ.get("PORT", 8000))
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=port)
