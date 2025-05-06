@@ -4,6 +4,7 @@ Wikidata MCP Server (SSE Version)
 This module implements a Model Context Protocol (MCP) server with SSE transport
 that connects Large Language Models to Wikidata's structured knowledge base.
 """
+import os
 import json
 import asyncio
 from typing import Optional, List, Dict, Any
