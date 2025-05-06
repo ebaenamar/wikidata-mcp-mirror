@@ -390,7 +390,12 @@ def health():
 @app.get("/sse")
 async def sse_endpoint(request: Request):
     """SSE endpoint for MCP connections"""
-    print(f"SSE connection request received from: {request.client.host if hasattr(request, 'client') and request.client else 'unknown'}")
+    client_host = request.client.host if hasattr(request, 'client') and request.client else 'unknown'
+    print(f"SSE connection request received from: {client_host}")
+    
+    # Generar un ID de sesión si no existe
+    session_id = request.query_params.get("session_id", str(uuid4()))
+    print(f"Using session ID: {session_id}")
     
     # Use the standard SseServerTransport approach
     async with sse_transport.connect_sse(
@@ -401,6 +406,7 @@ async def sse_endpoint(request: Request):
         # Create timeout options with extended timeout
         timeout_options = {"timeoutMs": 600000}  # 10 minutes
         
+        print(f"Starting MCP server with session ID: {session_id}")
         # Run MCP server
         await mcp._mcp_server.run(
             read_stream,
@@ -418,14 +424,30 @@ async def options_messages():
 @app.post("/messages")
 async def post_messages_no_slash(request: Request):
     """Handle POST requests to /messages endpoint (no trailing slash)"""
-    print(f"POST request to /messages received from: {request.client.host if hasattr(request, 'client') and request.client else 'unknown'}")
+    client_host = request.client.host if hasattr(request, 'client') and request.client else 'unknown'
+    print(f"POST request to /messages received from: {client_host}")
     
     # Extraer el session_id de los parámetros de consulta
     session_id = request.query_params.get("session_id")
     print(f"Session ID from query params: {session_id}")
     
+    # Imprimir el cuerpo de la solicitud para depuración
+    body = await request.body()
+    print(f"Request body: {body.decode('utf-8')}")
+    
     # Usar el handler del transporte SSE directamente
-    return await sse_transport.handle_post_message(request)
+    try:
+        response = await sse_transport.handle_post_message(request)
+        print(f"Response status: {response.status_code}")
+        return response
+    except Exception as e:
+        print(f"Error handling POST request: {e}")
+        # Devolver un error 500 con el mensaje de error
+        return Response(
+            content=json.dumps({"error": str(e)}),
+            status_code=500,
+            media_type="application/json"
+        )
 
 # Mount the messages endpoint with trailing slash for handling POST requests
 app.mount("/messages/", app=sse_transport.handle_post_message)
