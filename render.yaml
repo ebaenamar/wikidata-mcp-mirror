@@ -3,7 +3,7 @@ services:
     name: wikidata-mcp-server
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python render_server.py
+    startCommand: gunicorn -k uvicorn.workers.UvicornWorker render_server:app
     envVars:
       - key: PORT
         value: 10000
