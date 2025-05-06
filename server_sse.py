@@ -360,23 +360,14 @@ Follow these steps:
 
 # ============= CREATE SSE APP =============
 
-# Create an SSE transport with the correct path
-sse_transport = SseServerTransport("/messages")
+# Configure SSE transport with increased timeouts
+sse_transport = SseServerTransport(
+    "/messages",
+    ping_interval=20,  # Send ping every 20 seconds to keep connection alive
+    reconnect_timeout=10000  # Allow client to reconnect within 10 seconds
+)
 
 # Define SSE handler
-async def handle_sse(request: Request):
-    async with sse_transport.connect_sse(
-        request.scope, request.receive, request._send
-    ) as streams:
-        await mcp._mcp_server.run(
-            streams[0], 
-            streams[1], 
-            mcp._mcp_server.create_initialization_options()
-        )
-    # Return empty response to avoid NoneType error
-    return Response()
-
-# Create FastAPI routes - make sure the root path is handled
 app = FastAPI()
 
 app.add_middleware(
@@ -387,13 +378,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/sse")
+async def sse(request: Request):
+    """SSE endpoint for MCP connections."""
+    return await handle_sse(request)
+
+async def handle_sse(request: Request):
+    """Handle SSE connections for MCP."""
+    print(f"SSE connection request received from: {request.client.host if hasattr(request, 'client') else 'unknown'}")
+    print(f"Request headers: {request.headers}")
+    
+    try:
+        print("Attempting to establish SSE connection...")
+        async with sse_transport.connect_sse(
+            request.scope, request.receive, request._send
+        ) as streams:
+            print("SSE connection established successfully, starting MCP server...")
+            
+            # Create initialization options with extended timeout
+            init_options = mcp._mcp_server.create_initialization_options()
+            init_options["timeoutMs"] = 120000  # Extend timeout to 2 minutes
+            
+            await mcp._mcp_server.run(
+                streams[0], 
+                streams[1], 
+                init_options
+            )
+            print("MCP server session completed normally")
+        # Return empty response to avoid NoneType error
+        return Response()
+    except Exception as e:
+        error_msg = f"Error in SSE connection: {str(e)}"
+        print(error_msg)
+        import traceback
+        print(traceback.format_exc())
+        return Response(content=error_msg, status_code=500)
+
 @app.get("/")
 async def root():
     return Response(content="Wikidata MCP Server is running. Use /sse for MCP connections.")
-
-@app.get("/sse")
-async def sse(request: Request):
-    return await handle_sse(request)
 
 # Mount the messages endpoint directly
 app.mount("/messages", sse_transport.handle_post_message)
@@ -404,11 +427,14 @@ if __name__ == "__main__":
     print("Starting Wikidata MCP Server with SSE transport...")
     port = int(os.environ.get("PORT", 8000))
     
-    # Configure uvicorn with longer timeouts for Railway
+    # Configure uvicorn with optimized settings for Railway
     uvicorn.run(
         app, 
         host="0.0.0.0", 
         port=port,
-        timeout_keep_alive=120,  # Increase keep-alive timeout to 2 minutes
-        log_level="info"
+        timeout_keep_alive=300,  # Increase keep-alive timeout to 5 minutes
+        log_level="info",
+        proxy_headers=True,      # Enable proxy headers
+        forwarded_allow_ips="*", # Allow all forwarded IPs
+        workers=1                # Use a single worker for SSE
     )
