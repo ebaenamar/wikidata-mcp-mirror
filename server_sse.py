@@ -431,6 +431,11 @@ async def post_messages_no_slash(request: Request):
     session_id = request.query_params.get("session_id")
     print(f"Session ID from query params: {session_id}")
     
+    # Si no hay session_id, generar uno nuevo
+    if not session_id:
+        session_id = str(uuid4())
+        print(f"Generated new session ID: {session_id}")
+    
     # Imprimir el cuerpo de la solicitud para depuración
     body = await request.body()
     print(f"Request body: {body.decode('utf-8')}")
