@@ -361,9 +361,6 @@ Follow these steps:
 
 # ============= CREATE SSE APP =============
 
-# Configure SSE transport
-sse_transport = SseServerTransport("/messages")
-
 # Create FastAPI app with explicit CORS configuration
 app = FastAPI()
 
@@ -403,10 +400,8 @@ async def sse_endpoint(request: Request):
     print(f"Created new session: {session_id}")
     
     # Store connection info
-    from asyncio import Queue
-    read_queue = Queue()
-    write_queue = Queue()
-    from datetime import datetime
+    read_queue = asyncio.Queue()
+    write_queue = asyncio.Queue()
     active_connections[session_id] = {
         "read_queue": read_queue,
         "write_queue": write_queue,
@@ -417,10 +412,10 @@ async def sse_endpoint(request: Request):
     # Define the event generator function
     async def generate():
         # Send initial message with session ID
+        print(f"Sending initial message with session ID: {session_id}")
         yield f"event: endpoint\ndata: /messages?session_id={session_id}\n\n"
         
         # Run MCP server in the background
-        import asyncio
         mcp_task = asyncio.create_task(
             run_mcp_server(read_queue, write_queue, session_id)
         )
@@ -465,6 +460,9 @@ async def post_messages(request: Request):
     """Explicitly handle POST requests to /messages"""
     # Get session ID from query parameters
     session_id = request.query_params.get("session_id")
+    print(f"Received message for session ID: {session_id}")
+    print(f"Active sessions: {list(active_connections.keys())}")
+    
     if not session_id or session_id not in active_connections:
         print(f"Invalid session ID: {session_id}")
         return Response(content="Invalid session ID", status_code=400)
@@ -479,8 +477,8 @@ async def post_messages(request: Request):
     
     return Response(status_code=200)
 
-# Also mount the messages endpoint for compatibility
-app.mount("/messages", sse_transport.handle_post_message)
+# Do NOT mount the messages endpoint to avoid conflicts
+# app.mount("/messages", sse_transport.handle_post_message)
 
 async def run_mcp_server(read_queue, write_queue, session_id):
     """Run the MCP server with the given queues"""
