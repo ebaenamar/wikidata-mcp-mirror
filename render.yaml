@@ -3,8 +3,16 @@ services:
     name: wikidata-mcp-server
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python minimal_server.py
+    startCommand: python render_server.py
     envVars:
       - key: PORT
         value: 10000
     autoDeploy: true
+    healthCheckPath: /health
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+      - path: /*
+        name: Connection
+        value: keep-alive

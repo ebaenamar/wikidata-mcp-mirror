@@ -1,18 +1,19 @@
 """
-Wikidata MCP Server (SSE Version for Render)
+Optimized Wikidata MCP Server with SSE Transport for Render.com
 
-This module implements a Model Context Protocol (MCP) server with SSE transport
-that connects Large Language Models to Wikidata's structured knowledge base.
-Based on the implementation pattern from ragieai/fastapi-sse-mcp.
+This implementation is specifically designed to work well with Render's free tier.
 """
 import os
 import json
-from fastapi import FastAPI
-from starlette.applications import Starlette
-from starlette.routing import Mount, Route
-from mcp.server.sse import SseServerTransport
-from mcp.server.fastmcp import FastMCP
+import asyncio
 import uvicorn
+import logging
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response, StreamingResponse
+from mcp.server.fastmcp import FastMCP
+from datetime import datetime
+from uuid import uuid4
 
 from wikidata_api import (
     search_entity,
@@ -21,6 +22,13 @@ from wikidata_api import (
     get_entity_properties,
     execute_sparql
 )
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("wikidata-mcp")
 
 # Initialize FastMCP
 mcp = FastMCP(name="Wikidata Knowledge")
@@ -38,7 +46,10 @@ def search_wikidata_entity(query: str) -> str:
     Returns:
         The Wikidata entity ID (e.g., Q937) or an error message
     """
-    return search_entity(query)
+    logger.info(f"Searching for entity: {query}")
+    result = search_entity(query)
+    logger.info(f"Entity search result: {result[:100]}...")
+    return result
 
 @mcp.tool()
 def search_wikidata_property(query: str) -> str:
@@ -51,7 +62,10 @@ def search_wikidata_property(query: str) -> str:
     Returns:
         The Wikidata property ID (e.g., P31) or an error message
     """
-    return search_property(query)
+    logger.info(f"Searching for property: {query}")
+    result = search_property(query)
+    logger.info(f"Property search result: {result[:100]}...")
+    return result
 
 @mcp.tool()
 def get_wikidata_metadata(entity_id: str) -> str:
@@ -64,7 +78,10 @@ def get_wikidata_metadata(entity_id: str) -> str:
     Returns:
         JSON string with entity metadata (label, description, aliases)
     """
-    return get_entity_metadata(entity_id)
+    logger.info(f"Getting metadata for entity: {entity_id}")
+    result = get_entity_metadata(entity_id)
+    logger.info(f"Metadata result: {result[:100]}...")
+    return result
 
 @mcp.tool()
 def get_wikidata_properties(entity_id: str) -> str:
@@ -77,7 +94,10 @@ def get_wikidata_properties(entity_id: str) -> str:
     Returns:
         JSON string with entity properties
     """
-    return get_entity_properties(entity_id)
+    logger.info(f"Getting properties for entity: {entity_id}")
+    result = get_entity_properties(entity_id)
+    logger.info(f"Properties result: {result[:100]}...")
+    return result
 
 @mcp.tool()
 def execute_wikidata_sparql(query: str) -> str:
@@ -90,148 +110,177 @@ def execute_wikidata_sparql(query: str) -> str:
     Returns:
         JSON string with query results
     """
-    return execute_sparql(query)
+    logger.info(f"Executing SPARQL query: {query[:100]}...")
+    result = execute_sparql(query)
+    logger.info(f"SPARQL result: {result[:100]}...")
+    return result
 
-@mcp.tool()
-def find_entity_facts(entity_name: str, property_name: str = None) -> str:
-    """
-    Search for an entity and find its facts, optionally filtering by a property.
-    
-    Args:
-        entity_name: The name of the entity to search for
-        property_name: Optional name of a property to filter by
-        
-    Returns:
-        A JSON string containing the entity facts
-    """
-    # Search for the entity
-    entity_id = search_entity(entity_name)
-    if entity_id == "No entity found":
-        return json.dumps({"error": f"No entity found for '{entity_name}'"})
-    
-    # Get metadata
-    metadata = get_entity_metadata(entity_id)
-    
-    # If a property is specified, search for it
-    property_id = None
-    if property_name:
-        property_id = search_property(property_name)
-        if property_id == "No property found":
-            return json.dumps({"error": f"No property found for '{property_name}'"})
-    
-    # Construct SPARQL query
-    if property_id:
-        sparql_query = f"""
-        SELECT ?value ?valueLabel
-        WHERE {{
-          wd:{entity_id} wdt:{property_id} ?value.
-          SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-        }}
-        LIMIT 10
-        """
-    else:
-        sparql_query = f"""
-        SELECT ?prop ?propLabel ?value ?valueLabel
-        WHERE {{
-          wd:{entity_id} ?p ?value.
-          ?prop wikibase:directClaim ?p.
-          
-          # Filter out some common non-entity relations
-          FILTER(isIRI(?value) || isLiteral(?value))
-          
-          SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-        }}
-        LIMIT 10
-        """
-    
-    facts = execute_sparql(sparql_query)
-    
-    # Combine all results
-    return json.dumps({
-        "entity": metadata,
-        "property": {"id": property_id, "name": property_name} if property_id else None,
-        "facts": json.loads(facts)
-    })
+# ============= FASTAPI APP =============
 
-@mcp.tool()
-def get_related_entities(entity_id: str, relation_property: str = None, limit: int = 10) -> str:
-    """
-    Find entities related to the given entity, optionally by a specific relation.
-    
-    Args:
-        entity_id: The Wikidata entity ID (e.g., Q937)
-        relation_property: Optional Wikidata property ID for the relation (e.g., P31)
-        limit: Maximum number of results to return
-        
-    Returns:
-        JSON string containing related entities
-    """
-    if relation_property:
-        # Query for specific relation
-        sparql_query = f"""
-        SELECT ?related ?relatedLabel
-        WHERE {{
-          wd:{entity_id} wdt:{relation_property} ?related.
-          SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-        }}
-        LIMIT {limit}
-        """
-    else:
-        # Query for any relation
-        sparql_query = f"""
-        SELECT ?relation ?relationLabel ?related ?relatedLabel
-        WHERE {{
-          wd:{entity_id} ?p ?related.
-          ?property wikibase:directClaim ?p.
-          BIND(?property as ?relation)
-          
-          # Filter out some common non-entity relations
-          FILTER(STRSTARTS(STR(?related), "http://www.wikidata.org/entity/"))
-          
-          SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-        }}
-        LIMIT {limit}
-        """
-    
-    return execute_sparql(sparql_query)
-
-# ============= CREATE SSE SERVER =============
-
-def create_sse_server(mcp_instance):
-    """Create a Starlette app that handles SSE connections and message handling"""
-    transport = SseServerTransport("/messages/")
-
-    # Define handler functions
-    async def root_handler(request):
-        return {"message": "Wikidata MCP Server is running. Use /sse/ for MCP connections."}
-
-    async def handle_sse(request):
-        async with transport.connect_sse(
-            request.scope, request.receive, request._send
-        ) as streams:
-            await mcp_instance._mcp_server.run(
-                streams[0], streams[1], mcp_instance._mcp_server.create_initialization_options()
-            )
-
-    # Create Starlette routes for SSE and message handling
-    routes = [
-        Route("/", endpoint=root_handler),
-        Route("/sse/", endpoint=handle_sse),
-        Mount("/messages/", app=transport.handle_post_message),
-    ]
-
-    # Create a Starlette app
-    return Starlette(routes=routes)
-
-# Create FastAPI app
 app = FastAPI()
 
-# Mount the Starlette SSE server onto the FastAPI app
-app.mount("/", create_sse_server(mcp))
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+# Store active SSE connections
+active_connections = {}
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    logger.info("Root endpoint accessed")
+    return {"message": "Wikidata MCP Server is running. Use /sse for MCP connections."}
+
+@app.get("/health")
+async def health():
+    """Health check endpoint for Render"""
+    return {"status": "healthy", "connections": len(active_connections)}
+
+@app.get("/sse")
+async def sse_endpoint(request: Request):
+    """SSE endpoint for MCP connections"""
+    client_host = request.client.host if hasattr(request, 'client') and request.client else "unknown"
+    logger.info(f"SSE connection request received from: {client_host}")
+    logger.info(f"Request headers: {dict(request.headers)}")
+    
+    async def event_generator():
+        # Generate a unique session ID
+        session_id = str(uuid4())
+        logger.info(f"Created new session: {session_id}")
+        
+        # Store connection info
+        read_queue = asyncio.Queue()
+        write_queue = asyncio.Queue()
+        active_connections[session_id] = {
+            "read_queue": read_queue,
+            "write_queue": write_queue,
+            "created_at": datetime.now(),
+            "client_host": client_host
+        }
+        
+        # Send initial message with session ID
+        yield f"event: endpoint\ndata: /messages?session_id={session_id}\n\n"
+        
+        # Run MCP server in the background
+        mcp_task = asyncio.create_task(
+            run_mcp_server(read_queue, write_queue, session_id)
+        )
+        
+        # Keep connection alive with periodic pings
+        ping_task = asyncio.create_task(
+            send_periodic_pings(session_id)
+        )
+        
+        try:
+            # Forward messages from the write queue to the client
+            while True:
+                message = await write_queue.get()
+                if message is None:  # None is our signal to close the connection
+                    break
+                yield f"data: {message}\n\n"
+                logger.debug(f"Sent message to client: {message[:50]}...")
+        finally:
+            # Clean up
+            ping_task.cancel()
+            if not mcp_task.done():
+                mcp_task.cancel()
+            if session_id in active_connections:
+                del active_connections[session_id]
+            logger.info(f"Closed session: {session_id}")
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+@app.post("/messages")
+async def messages_endpoint(request: Request):
+    """Handle messages from the client"""
+    # Get session ID from query parameters
+    session_id = request.query_params.get("session_id")
+    if not session_id or session_id not in active_connections:
+        logger.warning(f"Invalid session ID: {session_id}")
+        return Response(content="Invalid session ID", status_code=400)
+    
+    # Get message from request body
+    body = await request.body()
+    message = body.decode("utf-8")
+    logger.debug(f"Received message from client: {message[:50]}...")
+    
+    # Put message in the read queue
+    await active_connections[session_id]["read_queue"].put(message)
+    
+    return Response(status_code=200)
+
+async def run_mcp_server(read_queue, write_queue, session_id):
+    """Run the MCP server with the given queues"""
+    logger.info(f"Starting MCP server for session: {session_id}")
+    try:
+        # Create stream adapters
+        from mcp.transport.stream import QueueReadStream, QueueWriteStream
+        read_stream = QueueReadStream(read_queue)
+        write_stream = QueueWriteStream(write_queue)
+        
+        # Create initialization options with extended timeout
+        init_options = mcp._mcp_server.create_initialization_options()
+        init_options["timeoutMs"] = 300000  # 5 minutes
+        
+        # Run MCP server
+        await mcp._mcp_server.run(
+            read_stream,
+            write_stream,
+            init_options
+        )
+        logger.info(f"MCP server completed normally for session: {session_id}")
+    except asyncio.CancelledError:
+        logger.info(f"MCP server cancelled for session: {session_id}")
+    except Exception as e:
+        logger.error(f"Error in MCP server for session {session_id}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+    finally:
+        # Signal to close the connection
+        await write_queue.put(None)
+        logger.info(f"MCP server stopped for session: {session_id}")
+
+async def send_periodic_pings(session_id):
+    """Send periodic pings to keep the connection alive"""
+    try:
+        while session_id in active_connections:
+            # Send a ping comment every 10 seconds
+            await asyncio.sleep(10)
+            if session_id in active_connections:
+                write_queue = active_connections[session_id]["write_queue"]
+                ping_message = f": ping - {datetime.now().isoformat()}"
+                await write_queue.put(ping_message)
+                logger.debug(f"Sent ping to session {session_id}")
+    except asyncio.CancelledError:
+        logger.info(f"Ping task cancelled for session: {session_id}")
+    except Exception as e:
+        logger.error(f"Error in ping task for session {session_id}: {str(e)}")
 
 # ============= SERVER EXECUTION =============
 
 if __name__ == "__main__":
-    print("Starting Wikidata MCP Server with SSE transport...")
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    logger.info("Starting Optimized Wikidata MCP Server for Render.com...")
+    port = int(os.environ.get("PORT", 10000))
+    
+    # Configure uvicorn with optimized settings for Render
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=port,
+        timeout_keep_alive=300,  # 5 minutes
+        log_level="info"
+    )

@@ -1,15 +1,19 @@
 """
 Minimal Wikidata MCP Server with SSE Transport
 
-A simplified implementation focused on basic functionality.
+A simplified implementation optimized for Fly.io deployment.
 """
 import os
 import json
+import asyncio
 import uvicorn
+import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from mcp.server.fastmcp import FastMCP
+from datetime import datetime
+from uuid import uuid4
 
 from wikidata_api import (
     search_entity,
@@ -18,6 +22,13 @@ from wikidata_api import (
     get_entity_properties,
     execute_sparql
 )
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("wikidata-mcp")
 
 # Initialize FastMCP
 mcp = FastMCP(name="Wikidata Knowledge")
@@ -35,7 +46,10 @@ def search_wikidata_entity(query: str) -> str:
     Returns:
         The Wikidata entity ID (e.g., Q937) or an error message
     """
-    return search_entity(query)
+    logger.info(f"Searching for entity: {query}")
+    result = search_entity(query)
+    logger.info(f"Entity search result: {result[:100]}...")
+    return result
 
 @mcp.tool()
 def search_wikidata_property(query: str) -> str:
@@ -48,7 +62,10 @@ def search_wikidata_property(query: str) -> str:
     Returns:
         The Wikidata property ID (e.g., P31) or an error message
     """
-    return search_property(query)
+    logger.info(f"Searching for property: {query}")
+    result = search_property(query)
+    logger.info(f"Property search result: {result[:100]}...")
+    return result
 
 @mcp.tool()
 def get_wikidata_metadata(entity_id: str) -> str:
@@ -61,7 +78,10 @@ def get_wikidata_metadata(entity_id: str) -> str:
     Returns:
         JSON string with entity metadata (label, description, aliases)
     """
-    return get_entity_metadata(entity_id)
+    logger.info(f"Getting metadata for entity: {entity_id}")
+    result = get_entity_metadata(entity_id)
+    logger.info(f"Metadata result: {result[:100]}...")
+    return result
 
 @mcp.tool()
 def get_wikidata_properties(entity_id: str) -> str:
@@ -74,7 +94,10 @@ def get_wikidata_properties(entity_id: str) -> str:
     Returns:
         JSON string with entity properties
     """
-    return get_entity_properties(entity_id)
+    logger.info(f"Getting properties for entity: {entity_id}")
+    result = get_entity_properties(entity_id)
+    logger.info(f"Properties result: {result[:100]}...")
+    return result
 
 @mcp.tool()
 def execute_wikidata_sparql(query: str) -> str:
@@ -87,7 +110,10 @@ def execute_wikidata_sparql(query: str) -> str:
     Returns:
         JSON string with query results
     """
-    return execute_sparql(query)
+    logger.info(f"Executing SPARQL query: {query[:100]}...")
+    result = execute_sparql(query)
+    logger.info(f"SPARQL result: {result[:100]}...")
+    return result
 
 # ============= FASTAPI APP =============
 
@@ -98,47 +124,51 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
-
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    return {"message": "Wikidata MCP Server is running. Use /sse for MCP connections."}
-
-# ============= DIRECT MCP IMPLEMENTATION =============
 
 # Store active SSE connections
 active_connections = {}
 
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    logger.info("Root endpoint accessed")
+    return {"message": "Wikidata MCP Server is running. Use /sse for MCP connections."}
+
+@app.get("/health")
+async def health():
+    """Health check endpoint for Fly.io"""
+    return {"status": "healthy", "connections": len(active_connections)}
+
 @app.get("/sse")
 async def sse_endpoint(request: Request):
     """SSE endpoint for MCP connections"""
-    print(f"SSE connection request received from: {request.client}")
+    client_host = request.client.host if hasattr(request, 'client') and request.client else "unknown"
+    logger.info(f"SSE connection request received from: {client_host}")
+    logger.info(f"Request headers: {dict(request.headers)}")
     
     async def event_generator():
         # Generate a unique session ID
-        import uuid
-        session_id = str(uuid.uuid4())
-        print(f"Created new session: {session_id}")
+        session_id = str(uuid4())
+        logger.info(f"Created new session: {session_id}")
         
         # Store connection info
-        from asyncio import Queue
-        read_queue = Queue()
-        write_queue = Queue()
+        read_queue = asyncio.Queue()
+        write_queue = asyncio.Queue()
         active_connections[session_id] = {
             "read_queue": read_queue,
             "write_queue": write_queue,
-            "created_at": import_time()
+            "created_at": datetime.now(),
+            "client_host": client_host
         }
         
         # Send initial message with session ID
         yield f"event: endpoint\ndata: /messages?session_id={session_id}\n\n"
         
         # Run MCP server in the background
-        import asyncio
-        asyncio.create_task(
+        mcp_task = asyncio.create_task(
             run_mcp_server(read_queue, write_queue, session_id)
         )
         
@@ -154,12 +184,15 @@ async def sse_endpoint(request: Request):
                 if message is None:  # None is our signal to close the connection
                     break
                 yield f"data: {message}\n\n"
+                logger.debug(f"Sent message to client: {message[:50]}...")
         finally:
             # Clean up
             ping_task.cancel()
+            if not mcp_task.done():
+                mcp_task.cancel()
             if session_id in active_connections:
                 del active_connections[session_id]
-            print(f"Closed session: {session_id}")
+            logger.info(f"Closed session: {session_id}")
     
     return StreamingResponse(
         event_generator(),
@@ -177,11 +210,13 @@ async def messages_endpoint(request: Request):
     # Get session ID from query parameters
     session_id = request.query_params.get("session_id")
     if not session_id or session_id not in active_connections:
+        logger.warning(f"Invalid session ID: {session_id}")
         return Response(content="Invalid session ID", status_code=400)
     
     # Get message from request body
     body = await request.body()
     message = body.decode("utf-8")
+    logger.debug(f"Received message from client: {message[:50]}...")
     
     # Put message in the read queue
     await active_connections[session_id]["read_queue"].put(message)
@@ -190,52 +225,58 @@ async def messages_endpoint(request: Request):
 
 async def run_mcp_server(read_queue, write_queue, session_id):
     """Run the MCP server with the given queues"""
-    print(f"Starting MCP server for session: {session_id}")
+    logger.info(f"Starting MCP server for session: {session_id}")
     try:
         # Create stream adapters
         from mcp.transport.stream import QueueReadStream, QueueWriteStream
         read_stream = QueueReadStream(read_queue)
         write_stream = QueueWriteStream(write_queue)
         
+        # Create initialization options with extended timeout
+        init_options = mcp._mcp_server.create_initialization_options()
+        init_options["timeoutMs"] = 300000  # 5 minutes
+        
         # Run MCP server
         await mcp._mcp_server.run(
             read_stream,
             write_stream,
-            mcp._mcp_server.create_initialization_options()
+            init_options
         )
+        logger.info(f"MCP server completed normally for session: {session_id}")
+    except asyncio.CancelledError:
+        logger.info(f"MCP server cancelled for session: {session_id}")
     except Exception as e:
-        print(f"Error in MCP server for session {session_id}: {str(e)}")
+        logger.error(f"Error in MCP server for session {session_id}: {str(e)}")
         import traceback
-        print(traceback.format_exc())
+        logger.error(traceback.format_exc())
     finally:
         # Signal to close the connection
         await write_queue.put(None)
-        print(f"MCP server stopped for session: {session_id}")
+        logger.info(f"MCP server stopped for session: {session_id}")
 
 async def send_periodic_pings(session_id):
     """Send periodic pings to keep the connection alive"""
-    import asyncio
-    from datetime import datetime
-    
-    while session_id in active_connections:
-        # Send a ping comment every 15 seconds
-        await asyncio.sleep(15)
-        if session_id in active_connections:
-            write_queue = active_connections[session_id]["write_queue"]
-            await write_queue.put(f": ping - {datetime.now().isoformat()}")
-
-def import_time():
-    """Import time module and return current time"""
-    from datetime import datetime
-    return datetime.now()
+    try:
+        while session_id in active_connections:
+            # Send a ping comment every 10 seconds
+            await asyncio.sleep(10)
+            if session_id in active_connections:
+                write_queue = active_connections[session_id]["write_queue"]
+                ping_message = f": ping - {datetime.now().isoformat()}"
+                await write_queue.put(ping_message)
+                logger.debug(f"Sent ping to session {session_id}")
+    except asyncio.CancelledError:
+        logger.info(f"Ping task cancelled for session: {session_id}")
+    except Exception as e:
+        logger.error(f"Error in ping task for session {session_id}: {str(e)}")
 
 # ============= SERVER EXECUTION =============
 
 if __name__ == "__main__":
-    print("Starting Minimal Wikidata MCP Server...")
+    logger.info("Starting Minimal Wikidata MCP Server optimized for Fly.io...")
     port = int(os.environ.get("PORT", 8000))
     
-    # Configure uvicorn with optimized settings
+    # Configure uvicorn with optimized settings for Fly.io
     uvicorn.run(
         app, 
         host="0.0.0.0", 
