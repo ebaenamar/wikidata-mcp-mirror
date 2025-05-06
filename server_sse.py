@@ -363,24 +363,27 @@ Follow these steps:
 # Configure SSE transport
 sse_transport = SseServerTransport("/messages")
 
-# Define SSE handler
+# Create FastAPI app with explicit CORS configuration
 app = FastAPI()
 
+# Add CORS middleware with explicit configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
+# Define root endpoint
+@app.get("/")
+async def root():
+    return Response(content="Wikidata MCP Server is running. Use /sse for MCP connections.")
+
+# Define SSE endpoint
 @app.get("/sse")
 async def sse(request: Request):
     """SSE endpoint for MCP connections."""
-    return await handle_sse(request)
-
-async def handle_sse(request: Request):
-    """Handle SSE connections for MCP."""
     print(f"SSE connection request received from: {request.client.host if hasattr(request, 'client') else 'unknown'}")
     print(f"Request headers: {request.headers}")
     
@@ -410,11 +413,24 @@ async def handle_sse(request: Request):
         print(traceback.format_exc())
         return Response(content=error_msg, status_code=500)
 
-@app.get("/")
-async def root():
-    return Response(content="Wikidata MCP Server is running. Use /sse for MCP connections.")
+# Define explicit POST endpoint for messages
+@app.post("/messages")
+async def post_messages(request: Request):
+    """Explicitly handle POST requests to /messages"""
+    print(f"POST request to /messages received from: {request.client.host if hasattr(request, 'client') else 'unknown'}")
+    print(f"Request headers: {request.headers}")
+    
+    try:
+        # Forward to SSE transport handler
+        return await sse_transport.handle_post_message(request.scope, request.receive, request._send)
+    except Exception as e:
+        error_msg = f"Error handling POST to /messages: {str(e)}"
+        print(error_msg)
+        import traceback
+        print(traceback.format_exc())
+        return Response(content=error_msg, status_code=500)
 
-# Mount the messages endpoint directly
+# Also mount the messages endpoint for compatibility
 app.mount("/messages", sse_transport.handle_post_message)
 
 # ============= SERVER EXECUTION =============
