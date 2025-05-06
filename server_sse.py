@@ -361,10 +361,13 @@ Follow these steps:
 
 # ============= CREATE SSE APP =============
 
+# Configure SSE transport
+sse_transport = SseServerTransport("/messages/")
+
 # Create FastAPI app with explicit CORS configuration
 app = FastAPI()
 
-# Add CORS middleware with explicit configuration
+# Add CORS middleware with explicit CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -373,173 +376,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Store active SSE connections
-active_connections = {}
-
 # Define root endpoint
 @app.get("/")
-async def root():
-    print("Root endpoint accessed")
-    return Response(content="Wikidata MCP Server is running. Use /sse for MCP connections.")
+def root():
+    return {"message": "Wikidata MCP Server is running. Use /sse for MCP connections."}
 
+# Health check endpoint for Render
 @app.get("/health")
-async def health():
-    """Health check endpoint for Render"""
-    return {"status": "healthy", "connections": len(active_connections)}
+def health():
+    return {"status": "healthy", "connections": 0}
 
 # Define SSE endpoint
 @app.get("/sse")
 async def sse_endpoint(request: Request):
     """SSE endpoint for MCP connections"""
-    client_host = request.client.host if hasattr(request, 'client') and request.client else "unknown"
-    print(f"SSE connection request received from: {client_host}")
-    print(f"Request headers: {dict(request.headers)}")
+    print(f"SSE connection request received from: {request.client.host if hasattr(request, 'client') and request.client else 'unknown'}")
     
-    # Generate a unique session ID
-    session_id = str(uuid4())
-    print(f"Created new session: {session_id}")
-    
-    # Store connection info
-    read_queue = asyncio.Queue()
-    write_queue = asyncio.Queue()
-    active_connections[session_id] = {
-        "read_queue": read_queue,
-        "write_queue": write_queue,
-        "created_at": datetime.now(),
-        "client_host": client_host
-    }
-    
-    # Define the event generator function
-    async def generate():
-        # Send initial message with session ID
-        print(f"Sending initial message with session ID: {session_id}")
-        yield f"event: endpoint\ndata: /messages?session_id={session_id}\n\n"
-        
-        # Run MCP server in the background
-        mcp_task = asyncio.create_task(
-            run_mcp_server(read_queue, write_queue, session_id)
-        )
-        
-        # Keep connection alive with periodic pings
-        ping_task = asyncio.create_task(
-            send_periodic_pings(session_id)
-        )
-        
-        try:
-            # Forward messages from the write queue to the client
-            while True:
-                message = await write_queue.get()
-                if message is None:  # None is our signal to close the connection
-                    break
-                yield f"data: {message}\n\n"
-                print(f"Sent message to client: {message[:50]}...")
-        finally:
-            # Clean up
-            ping_task.cancel()
-            if not mcp_task.done():
-                mcp_task.cancel()
-            if session_id in active_connections:
-                del active_connections[session_id]
-            print(f"Closed session: {session_id}")
-    
-    # Return a streaming response with the correct headers
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-            "Content-Type": "text/event-stream"
-        }
-    )
-
-# Define explicit POST endpoint for messages
-@app.post("/messages")
-async def post_messages(request: Request):
-    """Explicitly handle POST requests to /messages"""
-    # Get session ID from query parameters
-    session_id = request.query_params.get("session_id")
-    print(f"Received message for session ID: {session_id}")
-    print(f"Active sessions: {list(active_connections.keys())}")
-    
-    if not session_id or session_id not in active_connections:
-        print(f"Invalid session ID: {session_id}")
-        return Response(content="Invalid session ID", status_code=400)
-    
-    # Get message from request body
-    body = await request.body()
-    message = body.decode("utf-8")
-    print(f"Received message from client: {message[:50]}...")
-    
-    # Put message in the read queue
-    await active_connections[session_id]["read_queue"].put(message)
-    
-    return Response(status_code=200)
-
-# Do NOT mount the messages endpoint to avoid conflicts
-# app.mount("/messages", sse_transport.handle_post_message)
-
-async def run_mcp_server(read_queue, write_queue, session_id):
-    """Run the MCP server with the given queues"""
-    print(f"Starting MCP server for session: {session_id}")
-    try:
-        # Create simple stream adapters without using mcp.transport
-        class QueueReadStream:
-            def __init__(self, queue):
-                self.queue = queue
-            
-            async def read(self):
-                return await self.queue.get()
-        
-        class QueueWriteStream:
-            def __init__(self, queue):
-                self.queue = queue
-            
-            async def write(self, data):
-                await self.queue.put(data)
-        
-        read_stream = QueueReadStream(read_queue)
-        write_stream = QueueWriteStream(write_queue)
-        
-        # Create initialization options with extended timeout
+    # Use the standard SseServerTransport approach
+    async with sse_transport.connect_sse(
+        request.scope,
+        request.receive,
+        request._send,  # noqa: SLF001
+    ) as (read_stream, write_stream):
+        # Create timeout options
         timeout_options = {"timeoutMs": 300000}  # 5 minutes
         
         # Run MCP server
         await mcp._mcp_server.run(
             read_stream,
             write_stream,
-            timeout_options
+            timeout_options,
         )
-        print(f"MCP server completed normally for session: {session_id}")
-    except asyncio.CancelledError:
-        print(f"MCP server cancelled for session: {session_id}")
-    except Exception as e:
-        print(f"Error in MCP server for session {session_id}: {str(e)}")
-        import traceback
-        print(traceback.format_exc())
-    finally:
-        # Signal to close the connection
-        await write_queue.put(None)
-        print(f"MCP server stopped for session: {session_id}")
 
-async def send_periodic_pings(session_id):
-    """Send periodic pings to keep the connection alive"""
-    import asyncio
-    from datetime import datetime
-    try:
-        while session_id in active_connections:
-            # Send a ping comment every 10 seconds
-            await asyncio.sleep(10)
-            if session_id in active_connections:
-                write_queue = active_connections[session_id]["write_queue"]
-                ping_message = f": ping - {datetime.now().isoformat()}"
-                await write_queue.put(ping_message)
-                print(f"Sent ping to session {session_id}")
-    except asyncio.CancelledError:
-        print(f"Ping task cancelled for session: {session_id}")
-    except Exception as e:
-        print(f"Error in ping task for session {session_id}: {str(e)}")
+# Mount the messages endpoint for handling POST requests
+app.mount("/messages/", app=sse_transport.handle_post_message)
 
 # ============= SERVER EXECUTION =============
 
