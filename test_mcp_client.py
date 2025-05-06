@@ -37,7 +37,7 @@ def try_http_first():
             f"{SERVER_URL}/messages",
             headers=headers,
             data=json.dumps(init_message),
-            timeout=5
+            timeout=15
         )
         
         print(f"Respuesta HTTP-first: {response.status_code}")
@@ -61,7 +61,7 @@ def try_sse_only():
         # Establecer conexión SSE
         print(f"Conectando a {SERVER_URL}/sse...")
         headers = {'Accept': 'text/event-stream'}
-        response = requests.get(f"{SERVER_URL}/sse", headers=headers, stream=True, timeout=10)
+        response = requests.get(f"{SERVER_URL}/sse", headers=headers, stream=True, timeout=30)
         
         if response.status_code != 200:
             print(f"Error al conectar SSE: {response.status_code}")
@@ -119,7 +119,7 @@ def try_sse_only():
             f"{SERVER_URL}/messages?session_id={session_id}",
             headers=headers,
             data=json.dumps(init_message),
-            timeout=5
+            timeout=15
         )
         
         print(f"Respuesta del servidor (sin barra final): {init_response.status_code}")
@@ -132,7 +132,7 @@ def try_sse_only():
             f"{SERVER_URL}/messages/?session_id={session_id}",
             headers=headers,
             data=json.dumps(init_message),
-            timeout=5
+            timeout=15
         )
         
         print(f"Respuesta del servidor (con barra final): {init_response.status_code}")
@@ -152,7 +152,7 @@ def try_sse_only():
             f"{SERVER_URL}/messages/?session_id={session_id}",
             headers=headers,
             data=json.dumps(second_message),
-            timeout=5
+            timeout=15
         )
         
         print(f"Respuesta del segundo mensaje: {second_response.status_code}")

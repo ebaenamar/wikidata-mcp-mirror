@@ -397,28 +397,58 @@ async def sse_endpoint(request: Request):
     session_id = request.query_params.get("session_id", str(uuid4()))
     print(f"Using session ID: {session_id}")
     
-    # Use the standard SseServerTransport approach
-    async with sse_transport.connect_sse(
-        request.scope,
-        request.receive,
-        request._send,  # noqa: SLF001
-    ) as (read_stream, write_stream):
-        # Create timeout options with extended timeout
-        timeout_options = {"timeoutMs": 600000}  # 10 minutes
+    # Configurar cabeceras CORS explícitamente
+    response = Response(
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+        }
+    )
+    
+    # Crear un generador para enviar eventos SSE
+    async def event_generator():
+        # Enviar un evento inicial con el endpoint de mensajes
+        yield f"event: endpoint\ndata: /messages/?session_id={session_id}\n\n"
         
-        print(f"Starting MCP server with session ID: {session_id}")
-        # Run MCP server
-        await mcp._mcp_server.run(
-            read_stream,
-            write_stream,
-            timeout_options,
-        )
+        # Crear un mecanismo de ping/pong para mantener la conexión activa
+        ping_interval = 30  # segundos
+        ping_count = 0
+        
+        try:
+            while True:
+                # Enviar un ping cada ping_interval segundos
+                await asyncio.sleep(ping_interval)
+                ping_count += 1
+                yield f"event: ping\ndata: {ping_count}\n\n"
+                print(f"Sent ping {ping_count} to client {client_host}")
+        except asyncio.CancelledError:
+            print(f"SSE connection closed for client {client_host}")
+            raise
+        except Exception as e:
+            print(f"Error in SSE connection: {e}")
+            raise
+    
+    # Devolver una respuesta de streaming con el generador de eventos
+    return StreamingResponse(event_generator(), media_type="text/event-stream", headers=response.headers)
 
 # Añadir un endpoint OPTIONS explícito para /messages y /messages/
 @app.options("/messages")
 @app.options("/messages/")
 async def options_messages():
-    return Response(status_code=200)
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+        }
+    )
 
 # Añadir un endpoint POST explícito para /messages (sin barra final)
 @app.post("/messages")
@@ -443,11 +473,56 @@ async def post_messages_no_slash(request: Request):
     # Redirigir a la ruta con barra final
     return Response(
         status_code=307,  # Temporary Redirect
-        headers={"Location": f"/messages/?session_id={session_id}"}
+        headers={
+            "Location": f"/messages/?session_id={session_id}",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+        }
     )
 
-# Mount the messages endpoint with trailing slash for handling POST requests
-app.mount("/messages/", app=sse_transport.handle_post_message)
+# Endpoint POST para /messages/ (con barra final)
+@app.post("/messages/")
+async def post_messages_with_slash(request: Request):
+    """Handle POST requests to /messages/ endpoint (with trailing slash)"""
+    client_host = request.client.host if hasattr(request, 'client') and request.client else 'unknown'
+    print(f"POST request to /messages/ received from: {client_host}")
+    
+    # Extraer el session_id de los parámetros de consulta
+    session_id = request.query_params.get("session_id")
+    print(f"Session ID from query params: {session_id}")
+    
+    # Si no hay session_id, devolver un error
+    if not session_id:
+        return Response(
+            content="Invalid session ID",
+            status_code=400,
+            media_type="text/plain",
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Credentials": "true",
+            }
+        )
+    
+    # Imprimir el cuerpo de la solicitud para depuración
+    body = await request.body()
+    print(f"Request body: {body.decode('utf-8')}")
+    
+    # Procesar el mensaje (simplemente aceptarlo por ahora)
+    return Response(
+        content="Accepted",
+        status_code=202,
+        media_type="text/plain",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+        }
+    )
 
 # ============= SERVER EXECUTION =============
 
