@@ -360,12 +360,8 @@ Follow these steps:
 
 # ============= CREATE SSE APP =============
 
-# Configure SSE transport with increased timeouts
-sse_transport = SseServerTransport(
-    "/messages",
-    ping_interval=20,  # Send ping every 20 seconds to keep connection alive
-    reconnect_timeout=10000  # Allow client to reconnect within 10 seconds
-)
+# Configure SSE transport
+sse_transport = SseServerTransport("/messages")
 
 # Define SSE handler
 app = FastAPI()
