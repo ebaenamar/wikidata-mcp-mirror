@@ -1,18 +1,55 @@
 # Wikidata MCP Server (SSE Version)
 
-A Model Context Protocol (MCP) server with SSE transport that connects Large Language Models to Wikidata's structured knowledge base. This server enables LLMs to search for entities, retrieve metadata, query relationships, and execute SPARQL queries to access factual information from Wikidata.
+A Model Context Protocol (MCP) server with Server-Sent Events (SSE) transport that connects Large Language Models to Wikidata's structured knowledge base. This server enables LLMs to search for entities, retrieve metadata, query relationships, and execute SPARQL queries to access factual information from Wikidata.
 
 ## Features
 
+- **SSE Transport**: Network-accessible MCP server (vs. stdio in the original version)
 - Search for Wikidata entities by name
 - Search for Wikidata properties by name
 - Retrieve entity metadata (labels, descriptions)
+- Get entity properties and their values
 - Execute SPARQL queries against Wikidata's endpoint
+- Find entity facts with optional property filtering
+- Get related entities with optional relation filtering
 - Access common property references and SPARQL examples
 - Use prompt templates for common Wikidata interaction patterns
-- **SSE Transport**: Network-accessible MCP server (vs. stdio in the original version)
 
-## Installation
+## Live Demo
+
+The server is deployed and accessible at:
+
+- **URL**: [https://wikidata-mcp.onrender.com](https://wikidata-mcp.onrender.com)
+- **SSE Endpoint**: [https://wikidata-mcp.onrender.com/sse](https://wikidata-mcp.onrender.com/sse)
+
+## Usage with Claude Desktop
+
+To use this server with Claude Desktop:
+
+1. Edit the Claude Desktop configuration file located at:
+   ```
+   ~/Library/Application Support/Claude/claude_desktop_config.json
+   ```
+
+2. Configure it to use the remote MCP server:
+   ```json
+   {
+     "mcpServers": {
+       "Wikidata Knowledge Remote": {
+         "command": "mcp-remote",
+         "args": [
+           "https://wikidata-mcp.onrender.com/sse"
+         ]
+       }
+     }
+   }
+   ```
+
+3. Restart Claude Desktop
+
+4. When using Claude, you can now access Wikidata knowledge through the configured MCP server.
+
+## Local Development
 
 ### Prerequisites
 
@@ -21,194 +58,108 @@ A Model Context Protocol (MCP) server with SSE transport that connects Large Lan
 
 ### Setup
 
-1. Create and activate a virtual environment:
+1. Clone the repository:
    ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   git clone https://github.com/ebaenamar/wikidata-mcp.git
+   cd wikidata-mcp-server-sse
    ```
 
-2. Install dependencies:
+2. Create and activate a virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-## Usage
-
-### Running the Server
-
-To run the server locally:
-
-```bash
-python server_sse.py
-```
-
-This will start the server on `0.0.0.0:8000`.
-
-### Connecting to the Server
-
-You can connect to the server using any MCP client that supports SSE transport. The server URL will be:
-
-```
-http://localhost:8000
-```
-
-### Available Tools
-
-The server provides the following tools:
-
-1. `search_wikidata_entity`: Search for a Wikidata entity by name
-2. `search_wikidata_property`: Search for a Wikidata property by name
-3. `get_wikidata_metadata`: Get metadata for a Wikidata entity
-4. `get_wikidata_properties`: Get all properties for a Wikidata entity
-5. `execute_wikidata_sparql`: Execute a SPARQL query on Wikidata
-6. `find_entity_facts`: Search for an entity and find its facts
-7. `get_related_entities`: Find entities related to a given entity
-
-### Available Resources
-
-The server provides the following resources:
-
-1. `wikidata://common-properties`: A list of commonly used Wikidata properties
-2. `wikidata://sparql-examples`: Example SPARQL queries for common Wikidata tasks
-
-## Deployment
-
-### Railway Deployment
-
-Railway es una plataforma de despliegue que maneja bien las conexiones persistentes necesarias para servidores MCP con SSE. Sigue estos pasos para desplegar el servidor en Railway:
-
-1. **Crear una cuenta en Railway**
-   - Regístrate en [Railway](https://railway.app/)
-   - Instala la CLI de Railway: `npm install -g @railway/cli`
-   - Inicia sesión: `railway login`
-
-2. **Inicializar el proyecto en Railway**
+4. Run the server locally:
    ```bash
-   cd wikidata-mcp-server-sse
-   railway init
+   python server_sse.py
    ```
 
-3. **Desplegar el proyecto**
-   ```bash
-   railway up
-   ```
+   The server will start on `http://localhost:8000` by default.
 
-4. **Configurar variables de entorno (opcional)**
-   - Desde el dashboard de Railway, ve a tu proyecto
-   - Haz clic en "Variables"
-   - Añade cualquier variable de entorno necesaria
+## Testing the Server
 
-5. **Obtener la URL del servidor**
-   - Una vez desplegado, Railway proporcionará una URL para tu aplicación
-   - Usa esta URL con el formato `https://tu-app.railway.app/sse/` en la configuración de Claude Desktop
-
-### Configuración de Claude Desktop
-
-Para usar el servidor MCP desplegado en Railway con Claude Desktop:
-
-1. Edita el archivo de configuración de Claude Desktop:
-   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-
-2. Añade la configuración del servidor remoto:
-   ```json
-   {
-     "mcpServers": {
-       "Wikidata Knowledge Remote": {
-         "command": "npx",
-         "args": [
-           "mcp-remote",
-           "https://tu-app.railway.app/sse/"
-         ]
-       }
-     }
-   }
-   ```
-
-3. Reinicia Claude Desktop y selecciona "Wikidata Knowledge Remote" en el menú de servidores MCP.
-
-### Render Deployment
-
-También puedes desplegar el servidor en Render, aunque puede haber limitaciones con las conexiones SSE en el plan gratuito:
-
-1. Crea una cuenta en [Render](https://render.com/)
-2. Conecta tu repositorio de GitHub
-3. Crea un nuevo Web Service
-4. Configura el servicio:
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `python server_sse.py`
-
-### Vercel Deployment
-
-This SSE version can be deployed on Vercel. Create a `vercel.json` file with the following content:
-
-```json
-{
-  "builds": [
-    {
-      "src": "server_sse.py",
-      "use": "@vercel/python"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "server_sse.py"
-    }
-  ]
-}
-```
-
-Then deploy using the Vercel CLI:
+You can test the server using the included test client:
 
 ```bash
-vercel
+python test_mcp_client.py
 ```
 
-## Integration with NANDA
-
-To register this server in the NANDA ecosystem, you can use the `nanda_register.py` script included:
+Or manually with curl:
 
 ```bash
-python nanda_register.py --url https://your-app.onrender.com/sse --name "Wikidata Knowledge Server"
+# Connect to SSE endpoint
+curl -N -H "Accept: text/event-stream" https://wikidata-mcp.onrender.com/sse
+
+# Send a message (replace SESSION_ID with the one received from the SSE endpoint)
+curl -X POST "https://wikidata-mcp.onrender.com/messages/?session_id=YOUR_SESSION_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test-client","version":"0.1.0"}},"id":0}'
 ```
 
-## Integration with Claude Desktop
+## Deployment on Render
 
-To configure Claude Desktop to use this remote MCP server:
+The server is configured for deployment on Render.com using the `render.yaml` file. 
 
-1. Edit the Claude Desktop configuration file:
-   ```
-   ~/Library/Application Support/Claude/claude_desktop_config.json
-   ```
+### Deployment Configuration
 
-2. Update the configuration to use the remote server:
-   ```json
-   {
-     "mcpCommand": "npx",
-     "mcpArgs": ["mcp-remote", "https://your-app.onrender.com/sse"]
-   }
-   ```
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `gunicorn -k uvicorn.workers.UvicornWorker server_sse:app`
+- **Environment Variables**:
+  - `PORT`: 10000
+- **Health Check Path**: `/health`
+- **Headers**:
+  - `Cache-Control`: no-cache
+  - `Connection`: keep-alive
 
-3. Restart Claude Desktop to apply the changes.
+### How to Deploy
 
-## Testing
+1. Fork or clone this repository to your GitHub account
+2. Create a new Web Service on Render.com
+3. Connect your GitHub repository
+4. Render will automatically detect the `render.yaml` file and configure the deployment
+5. Click "Create Web Service"
 
-Once configured, you can test the server with Claude using prompts like:
+## Architecture
 
-- "¿Quién es Marie Curie según Wikidata?"
-- "¿Cuáles son las propiedades principales de la Luna en Wikidata?"
-- "Ejecuta una consulta SPARQL para encontrar los 5 ríos más largos del mundo."
+The server is built using:
 
-## Differences from stdio Version
+- **FastAPI**: For handling HTTP requests and routing
+- **SSE Transport**: For bidirectional communication with clients
+- **MCP Framework**: For implementing the Model Context Protocol
+- **Wikidata API**: For accessing Wikidata's knowledge base
 
-The main difference between this version and the original stdio version is the transport mechanism:
+### Key Components
 
-- **stdio version**: Runs locally and communicates through standard input/output streams. Ideal for local integrations like Claude Desktop.
-- **SSE version**: Runs as a web server and communicates through HTTP with Server-Sent Events. Ideal for network access and integration with the NANDA ecosystem.
+- `server_sse.py`: Main server implementation with SSE transport
+- `wikidata_api.py`: Functions for interacting with Wikidata's API and SPARQL endpoint
+- `requirements.txt`: Dependencies for the project
+- `render.yaml`: Configuration for deployment on Render.com
+- `test_mcp_client.py`: Test client for verifying server functionality
 
-The core functionality (tools, resources, prompts) remains the same between both versions.
+## Available MCP Tools
+
+The server provides the following MCP tools:
+
+- `search_wikidata_entity`: Search for entities by name
+- `search_wikidata_property`: Search for properties by name
+- `get_wikidata_metadata`: Get entity metadata (label, description)
+- `get_wikidata_properties`: Get all properties for an entity
+- `execute_wikidata_sparql`: Execute a SPARQL query
+- `find_entity_facts`: Search for an entity and find its facts
+- `get_related_entities`: Find entities related to a given entity
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Based on the Model Context Protocol (MCP) specification
+- Uses Wikidata as the knowledge source
+- Inspired by the MCP examples from the official documentation

@@ -362,7 +362,7 @@ Follow these steps:
 # ============= CREATE SSE APP =============
 
 # Configure SSE transport
-sse_transport = SseServerTransport("/messages/")
+sse_transport = SseServerTransport("/messages")  
 
 # Create FastAPI app with explicit CORS configuration
 app = FastAPI()
@@ -408,8 +408,13 @@ async def sse_endpoint(request: Request):
             timeout_options,
         )
 
+# Añadir un endpoint OPTIONS explícito para /messages
+@app.options("/messages")
+async def options_messages():
+    return Response(status_code=200)
+
 # Mount the messages endpoint for handling POST requests
-app.mount("/messages/", app=sse_transport.handle_post_message)
+app.mount("/messages", app=sse_transport.handle_post_message)  
 
 # ============= SERVER EXECUTION =============
 
