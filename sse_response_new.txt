@@ -1,0 +1,3 @@
+event: endpoint
+data: /messages?session_id=bbfdda21-f02f-46b4-a1f4-335ec0343079
+

@@ -503,14 +503,13 @@ async def run_mcp_server(read_queue, write_queue, session_id):
         write_stream = QueueWriteStream(write_queue)
         
         # Create initialization options with extended timeout
-        init_options = mcp._mcp_server.create_initialization_options()
-        init_options["timeoutMs"] = 300000  # 5 minutes
+        timeout_options = {"timeoutMs": 300000}  # 5 minutes
         
         # Run MCP server
         await mcp._mcp_server.run(
             read_stream,
             write_stream,
-            init_options
+            timeout_options
         )
         print(f"MCP server completed normally for session: {session_id}")
     except asyncio.CancelledError:
