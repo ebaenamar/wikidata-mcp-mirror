@@ -1,5 +1,5 @@
 """
-Wikidata MCP Server (SSE Version)
+Wikidata MCP Server with SSE Transport
 
 This module implements a Model Context Protocol (MCP) server with SSE transport
 that connects Large Language Models to Wikidata's structured knowledge base.
@@ -7,16 +7,17 @@ that connects Large Language Models to Wikidata's structured knowledge base.
 import os
 import json
 import asyncio
-from typing import Optional, List, Dict, Any
-
-from mcp.server.fastmcp import FastMCP
-from mcp.server.fastmcp.prompts import base
 import uvicorn
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.routing import Route, Mount
+from fastapi.responses import Response, StreamingResponse
 from mcp.server.sse import SseServerTransport
+from mcp.server.fastmcp import FastMCP
+from datetime import datetime
+from uuid import uuid4
 
+from mcp.server.fastmcp.prompts import base
+from starlette.routing import Route, Mount
 from wikidata_api import (
     search_entity,
     search_property,
@@ -398,7 +399,6 @@ async def sse_endpoint(request: Request):
     print(f"Request headers: {dict(request.headers)}")
     
     # Generate a unique session ID
-    from uuid import uuid4
     session_id = str(uuid4())
     print(f"Created new session: {session_id}")
     
