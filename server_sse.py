@@ -376,6 +376,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Almacenar sesiones activas
+active_sessions = {}
+
 # Define root endpoint
 @app.get("/")
 def root():
@@ -384,7 +387,7 @@ def root():
 # Health check endpoint for Render
 @app.get("/health")
 def health():
-    return {"status": "healthy", "connections": 0}
+    return {"status": "healthy", "connections": len(active_sessions)}
 
 # Define SSE endpoint
 @app.get("/sse")
@@ -394,8 +397,19 @@ async def sse_endpoint(request: Request):
     print(f"SSE connection request received from: {client_host}")
     
     # Generar un ID de sesión si no existe
-    session_id = request.query_params.get("session_id", str(uuid4()))
-    print(f"Using session ID: {session_id}")
+    session_id = request.query_params.get("session_id")
+    if not session_id:
+        session_id = str(uuid4())
+        print(f"Generated new session ID: {session_id}")
+    else:
+        print(f"Using existing session ID: {session_id}")
+    
+    # Registrar la sesión como activa
+    active_sessions[session_id] = {
+        "client_host": client_host,
+        "created_at": datetime.now().isoformat(),
+    }
+    print(f"Active sessions: {len(active_sessions)}")
     
     # Use the standard SseServerTransport approach
     async with sse_transport.connect_sse(
@@ -407,12 +421,24 @@ async def sse_endpoint(request: Request):
         timeout_options = {"timeoutMs": 600000}  # 10 minutes
         
         print(f"Starting MCP server with session ID: {session_id}")
-        # Run MCP server
-        await mcp._mcp_server.run(
-            read_stream,
-            write_stream,
-            timeout_options,
-        )
+        try:
+            # Run MCP server with proper initialization options
+            await mcp._mcp_server.run(
+                read_stream,
+                write_stream,
+                mcp._mcp_server.create_initialization_options(),
+            )
+        except Exception as e:
+            print(f"Error in MCP server: {e}")
+            # Eliminar la sesión si hay un error
+            if session_id in active_sessions:
+                del active_sessions[session_id]
+            raise
+        finally:
+            # Eliminar la sesión cuando se cierra la conexión
+            if session_id in active_sessions:
+                del active_sessions[session_id]
+            print(f"SSE connection closed for session {session_id}")
 
 # Añadir un endpoint OPTIONS explícito para /messages y /messages/
 @app.options("/messages")
@@ -439,26 +465,29 @@ async def post_messages_no_slash(request: Request):
     session_id = request.query_params.get("session_id")
     print(f"Session ID from query params: {session_id}")
     
-    # Si no hay session_id, generar uno nuevo
-    if not session_id:
-        session_id = str(uuid4())
-        print(f"Generated new session ID: {session_id}")
+    # Verificar si la sesión está activa
+    if not session_id or session_id not in active_sessions:
+        print(f"Session ID {session_id} not found in active sessions")
+        # Si no está activa, pero tenemos alguna sesión activa, usar la primera
+        if active_sessions:
+            first_session_id = next(iter(active_sessions.keys()))
+            print(f"Using first active session: {first_session_id}")
+            session_id = first_session_id
+        else:
+            # Si no hay sesiones activas, crear una nueva
+            session_id = str(uuid4())
+            print(f"No active sessions found, generated new session ID: {session_id}")
+            active_sessions[session_id] = {
+                "client_host": client_host,
+                "created_at": datetime.now().isoformat(),
+            }
     
     # Imprimir el cuerpo de la solicitud para depuración
     body = await request.body()
     print(f"Request body: {body.decode('utf-8')}")
     
-    # Redirigir a la ruta con barra final
-    return Response(
-        status_code=307,  # Temporary Redirect
-        headers={
-            "Location": f"/messages/?session_id={session_id}",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Allow-Credentials": "true",
-        }
-    )
+    # Usar el handle_post_message del SseServerTransport
+    return await sse_transport.handle_post_message(request)
 
 # Mount the messages endpoint with trailing slash for handling POST requests
 app.mount("/messages/", app=sse_transport.handle_post_message)
