@@ -361,8 +361,8 @@ Follow these steps:
 
 # ============= CREATE SSE APP =============
 
-# Configure SSE transport
-sse_transport = SseServerTransport("/messages")  
+# Configure SSE transport with trailing slash to match client expectations
+sse_transport = SseServerTransport("/messages/")  
 
 # Create FastAPI app with explicit CORS configuration
 app = FastAPI()
@@ -398,8 +398,8 @@ async def sse_endpoint(request: Request):
         request.receive,
         request._send,  # noqa: SLF001
     ) as (read_stream, write_stream):
-        # Create timeout options
-        timeout_options = {"timeoutMs": 300000}  # 5 minutes
+        # Create timeout options with extended timeout
+        timeout_options = {"timeoutMs": 600000}  # 10 minutes
         
         # Run MCP server
         await mcp._mcp_server.run(
@@ -408,13 +408,27 @@ async def sse_endpoint(request: Request):
             timeout_options,
         )
 
-# Añadir un endpoint OPTIONS explícito para /messages
+# Añadir un endpoint OPTIONS explícito para /messages y /messages/
 @app.options("/messages")
+@app.options("/messages/")
 async def options_messages():
     return Response(status_code=200)
 
-# Mount the messages endpoint for handling POST requests
-app.mount("/messages", app=sse_transport.handle_post_message)  
+# Añadir un endpoint POST explícito para /messages (sin barra final)
+@app.post("/messages")
+async def post_messages_no_slash(request: Request):
+    """Handle POST requests to /messages endpoint (no trailing slash)"""
+    print(f"POST request to /messages received from: {request.client.host if hasattr(request, 'client') and request.client else 'unknown'}")
+    
+    # Extraer el session_id de los parámetros de consulta
+    session_id = request.query_params.get("session_id")
+    print(f"Session ID from query params: {session_id}")
+    
+    # Usar el handler del transporte SSE directamente
+    return await sse_transport.handle_post_message(request)
+
+# Mount the messages endpoint with trailing slash for handling POST requests
+app.mount("/messages/", app=sse_transport.handle_post_message)
 
 # ============= SERVER EXECUTION =============
 
