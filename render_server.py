@@ -149,21 +149,22 @@ async def sse_endpoint(request: Request):
     logger.info(f"SSE connection request received from: {client_host}")
     logger.info(f"Request headers: {dict(request.headers)}")
     
-    async def event_generator():
-        # Generate a unique session ID
-        session_id = str(uuid4())
-        logger.info(f"Created new session: {session_id}")
-        
-        # Store connection info
-        read_queue = asyncio.Queue()
-        write_queue = asyncio.Queue()
-        active_connections[session_id] = {
-            "read_queue": read_queue,
-            "write_queue": write_queue,
-            "created_at": datetime.now(),
-            "client_host": client_host
-        }
-        
+    # Generate a unique session ID
+    session_id = str(uuid4())
+    logger.info(f"Created new session: {session_id}")
+    
+    # Store connection info
+    read_queue = asyncio.Queue()
+    write_queue = asyncio.Queue()
+    active_connections[session_id] = {
+        "read_queue": read_queue,
+        "write_queue": write_queue,
+        "created_at": datetime.now(),
+        "client_host": client_host
+    }
+    
+    # Define the event generator function
+    async def generate():
         # Send initial message with session ID
         yield f"event: endpoint\ndata: /messages?session_id={session_id}\n\n"
         
@@ -194,13 +195,15 @@ async def sse_endpoint(request: Request):
                 del active_connections[session_id]
             logger.info(f"Closed session: {session_id}")
     
+    # Return a streaming response with the correct headers
     return StreamingResponse(
-        event_generator(),
+        generate(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
+            "X-Accel-Buffering": "no",
+            "Content-Type": "text/event-stream"
         }
     )
 
