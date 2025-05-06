@@ -85,18 +85,44 @@ def get_wikidata_properties(entity_id: str) -> str:
     properties = get_entity_properties(entity_id)
     return json.dumps(properties)
 
-@mcp.tool()
-def execute_wikidata_sparql(sparql_query: str) -> str:
+@mcp.tool("execute_wikidata_sparql")
+def execute_sparql(sparql_query: str) -> dict:
     """
-    Execute a SPARQL query on Wikidata.
+    Execute a SPARQL query against Wikidata.
     
     Args:
-        sparql_query: SPARQL query to execute
+        sparql_query: The SPARQL query to execute.
         
     Returns:
-        JSON-formatted result of the query
+        The results of the SPARQL query.
     """
-    return execute_sparql(sparql_query)
+    try:
+        # Validate the query for common syntax errors
+        if '"' in sparql_query and not sparql_query.count('"') % 2 == 0:
+            return {"error": "Unbalanced double quotes in SPARQL query"}
+        
+        if "'" in sparql_query and not sparql_query.count("'") % 2 == 0:
+            return {"error": "Unbalanced single quotes in SPARQL query"}
+        
+        # Check for common syntax issues with FILTER
+        if 'FILTER(' in sparql_query and 'CONTAINS' in sparql_query:
+            # Check for potential issues with quotes in CONTAINS
+            if 'CONTAINS(str(' in sparql_query and '")' in sparql_query:
+                return {"error": "Possible quote issue in CONTAINS. Use single quotes inside double quotes or escape properly."}
+        
+        # Execute the query
+        sparql = SPARQLWrapper("https://query.wikidata.org/sparql")
+        sparql.setQuery(sparql_query)
+        sparql.setReturnFormat(JSON)
+        results = sparql.query().convert()
+        
+        return results
+    except Exception as e:
+        error_message = str(e)
+        # Provide more helpful error messages for common issues
+        if "Lexical error" in error_message and "Encountered: " in error_message:
+            return {"error": f"SPARQL syntax error: {error_message}. Check for unescaped quotes or special characters."}
+        return {"error": f"Error executing SPARQL query: {error_message}"}
 
 @mcp.tool()
 def find_entity_facts(entity_name: str, property_name: str = None) -> str:
