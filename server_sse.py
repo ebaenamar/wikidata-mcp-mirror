@@ -486,8 +486,21 @@ async def run_mcp_server(read_queue, write_queue, session_id):
     """Run the MCP server with the given queues"""
     print(f"Starting MCP server for session: {session_id}")
     try:
-        # Create stream adapters
-        from mcp.transport.stream import QueueReadStream, QueueWriteStream
+        # Create simple stream adapters without using mcp.transport
+        class QueueReadStream:
+            def __init__(self, queue):
+                self.queue = queue
+            
+            async def read(self):
+                return await self.queue.get()
+        
+        class QueueWriteStream:
+            def __init__(self, queue):
+                self.queue = queue
+            
+            async def write(self, data):
+                await self.queue.put(data)
+        
         read_stream = QueueReadStream(read_queue)
         write_stream = QueueWriteStream(write_queue)
         
