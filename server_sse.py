@@ -435,19 +435,11 @@ async def post_messages_no_slash(request: Request):
     body = await request.body()
     print(f"Request body: {body.decode('utf-8')}")
     
-    # Usar el handler del transporte SSE directamente
-    try:
-        response = await sse_transport.handle_post_message(request)
-        print(f"Response status: {response.status_code}")
-        return response
-    except Exception as e:
-        print(f"Error handling POST request: {e}")
-        # Devolver un error 500 con el mensaje de error
-        return Response(
-            content=json.dumps({"error": str(e)}),
-            status_code=500,
-            media_type="application/json"
-        )
+    # Redirigir a la ruta con barra final
+    return Response(
+        status_code=307,  # Temporary Redirect
+        headers={"Location": f"/messages/?session_id={session_id}"}
+    )
 
 # Mount the messages endpoint with trailing slash for handling POST requests
 app.mount("/messages/", app=sse_transport.handle_post_message)

@@ -68,6 +68,9 @@ def try_sse_only():
             print(f"Contenido: {response.text}")
             return False
             
+        print(f"Respuesta SSE: {response.status_code}")
+        print(f"Headers: {dict(response.headers)}")
+        
         client = sseclient.SSEClient(response)
         
         session_id = None
@@ -109,6 +112,8 @@ def try_sse_only():
             "id": 0
         }
         
+        # Probar primero con la ruta sin barra final
+        print("Probando con ruta sin barra final...")
         headers = {'Content-Type': 'application/json'}
         init_response = requests.post(
             f"{SERVER_URL}/messages?session_id={session_id}",
@@ -117,8 +122,9 @@ def try_sse_only():
             timeout=5
         )
         
-        print(f"Respuesta del servidor: {init_response.status_code}")
+        print(f"Respuesta del servidor (sin barra final): {init_response.status_code}")
         print(f"Contenido de la respuesta: {init_response.text}")
+        print(f"Headers: {dict(init_response.headers)}")
         
         # También probar con la ruta con barra final
         print("Probando con ruta con barra final...")
@@ -131,6 +137,26 @@ def try_sse_only():
         
         print(f"Respuesta del servidor (con barra final): {init_response.status_code}")
         print(f"Contenido de la respuesta: {init_response.text}")
+        print(f"Headers: {dict(init_response.headers)}")
+        
+        # Probar a enviar un segundo mensaje para ver si el ID de sesión se mantiene
+        print("Enviando un segundo mensaje para verificar la sesión...")
+        second_message = {
+            "jsonrpc": "2.0",
+            "method": "$/cancelRequest",
+            "params": {"id": 0},
+            "id": 1
+        }
+        
+        second_response = requests.post(
+            f"{SERVER_URL}/messages/?session_id={session_id}",
+            headers=headers,
+            data=json.dumps(second_message),
+            timeout=5
+        )
+        
+        print(f"Respuesta del segundo mensaje: {second_response.status_code}")
+        print(f"Contenido de la respuesta: {second_response.text}")
         
         return init_response.status_code in [200, 202]
         
