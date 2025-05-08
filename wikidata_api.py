@@ -10,7 +10,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 # Constants
 WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
 WIKIDATA_SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
-USER_AGENT = "Wikidata MCP Server/1.0 (https://github.com/ebaenamar/teacher-companion; contact@example.com)"
+USER_AGENT = "Wikidata MCP Server/1.0 (https://github.com/ebaenamar/wikidata-mcp; ebaenamar@gmail.com)"
 
 def search_entity(query: str) -> str:
     """
