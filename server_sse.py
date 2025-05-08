@@ -422,19 +422,27 @@ async def sse_endpoint(request: Request):
     client_host = request.client.host if hasattr(request, 'client') and request.client else 'unknown'
     print(f"SSE connection request received from: {client_host}")
     
-    # Generar un ID de sesión si no existe
-    session_id = request.query_params.get("session_id")
-    if not session_id:
+    # Check if there's a session ID in the query parameters
+    existing_session_id = request.query_params.get("session_id")
+    
+    # If a valid session ID was provided and exists, use it
+    if existing_session_id and existing_session_id in active_sessions:
+        session_id = existing_session_id
+        print(f"Using existing session ID: {session_id}")
+        # Update the last activity timestamp
+        active_sessions[session_id]["last_activity"] = datetime.now().isoformat()
+    else:
+        # Generate a new session ID for this connection
         session_id = str(uuid4())
         print(f"Generated new session ID: {session_id}")
-    else:
-        print(f"Using existing session ID: {session_id}")
-    
-    # Registrar la sesión como activa
-    active_sessions[session_id] = {
-        "client_host": client_host,
-        "created_at": datetime.now().isoformat(),
-    }
+        
+        # Store the session with more metadata
+        active_sessions[session_id] = {
+            "client_host": client_host,
+            "created_at": datetime.now().isoformat(),
+            "last_activity": datetime.now().isoformat(),
+            "connection_count": 1
+        }
     print(f"Active sessions: {len(active_sessions)}")
     
     # Use the standard SseServerTransport approach
@@ -448,18 +456,37 @@ async def sse_endpoint(request: Request):
         
         print(f"Starting MCP server with session ID: {session_id}")
         try:
+            # Add a small delay to ensure connection is fully established
+            await asyncio.sleep(0.5)
+            
+            # Create initialization options with extended timeout
+            init_options = mcp._mcp_server.create_initialization_options()
+            init_options["timeoutMs"] = 30000  # 30 seconds timeout for initialization
+            
             # Run MCP server with proper initialization options
             await mcp._mcp_server.run(
                 read_stream,
                 write_stream,
-                mcp._mcp_server.create_initialization_options(),
+                init_options
             )
+        except RuntimeError as re:
+            error_msg = str(re)
+            print(f"RuntimeError in MCP server: {error_msg}")
+            # Provide more detailed error message for initialization issues
+            if "initialization was complete" in error_msg:
+                print(f"Initialization error for session {session_id}. Client may have sent requests too early.")
+            # Eliminar la sesión si hay un error
+            if session_id in active_sessions:
+                del active_sessions[session_id]
+            # Don't re-raise the exception to prevent 500 errors
+            return Response(status_code=503, content="Service temporarily unavailable. Please try again.")
         except Exception as e:
             print(f"Error in MCP server: {e}")
             # Eliminar la sesión si hay un error
             if session_id in active_sessions:
                 del active_sessions[session_id]
-            raise
+            # Don't re-raise the exception to prevent 500 errors
+            return Response(status_code=500, content="Internal server error. Please try again later.")
         finally:
             # Eliminar la sesión cuando se cierra la conexión
             if session_id in active_sessions:
@@ -487,33 +514,63 @@ async def post_messages_no_slash(request: Request):
     client_host = request.client.host if hasattr(request, 'client') and request.client else 'unknown'
     print(f"POST request to /messages received from: {client_host}")
     
-    # Extraer el session_id de los parámetros de consulta
-    session_id = request.query_params.get("session_id")
-    print(f"Session ID from query params: {session_id}")
-    
-    # Verificar si la sesión está activa
-    if not session_id or session_id not in active_sessions:
-        print(f"Session ID {session_id} not found in active sessions")
-        # Si no está activa, pero tenemos alguna sesión activa, usar la primera
-        if active_sessions:
-            first_session_id = next(iter(active_sessions.keys()))
-            print(f"Using first active session: {first_session_id}")
-            session_id = first_session_id
+    try:
+        # Extract the session_id from query parameters
+        session_id = request.query_params.get("session_id")
+        print(f"Session ID from query params: {session_id}")
+        
+        # Verify if the session is active
+        if not session_id or session_id not in active_sessions:
+            print(f"Session ID {session_id} not found in active sessions")
+            # If we have any active sessions, use the most recently active one
+            if active_sessions:
+                # Sort sessions by last_activity if available
+                sorted_sessions = sorted(
+                    active_sessions.items(),
+                    key=lambda x: x[1].get("last_activity", x[1].get("created_at", "")),
+                    reverse=True
+                )
+                session_id = sorted_sessions[0][0]
+                print(f"Using most recent active session: {session_id}")
+                # Update session metadata
+                active_sessions[session_id]["last_activity"] = datetime.now().isoformat()
+                active_sessions[session_id]["message_count"] = active_sessions[session_id].get("message_count", 0) + 1
+            else:
+                # If no active sessions exist, create a new one
+                session_id = str(uuid4())
+                print(f"No active sessions found, generated new session ID: {session_id}")
+                active_sessions[session_id] = {
+                    "client_host": client_host,
+                    "created_at": datetime.now().isoformat(),
+                    "last_activity": datetime.now().isoformat(),
+                    "message_count": 1,
+                    "connection_count": 0  # Will be incremented when SSE connection is established
+                }
         else:
-            # Si no hay sesiones activas, crear una nueva
-            session_id = str(uuid4())
-            print(f"No active sessions found, generated new session ID: {session_id}")
-            active_sessions[session_id] = {
-                "client_host": client_host,
-                "created_at": datetime.now().isoformat(),
-            }
-    
-    # Imprimir el cuerpo de la solicitud para depuración
-    body = await request.body()
-    print(f"Request body: {body.decode('utf-8')}")
-    
-    # Usar el handle_post_message del SseServerTransport
-    return await sse_transport.handle_post_message(request)
+            # Update session metadata for existing session
+            active_sessions[session_id]["last_activity"] = datetime.now().isoformat()
+            active_sessions[session_id]["message_count"] = active_sessions[session_id].get("message_count", 0) + 1
+        
+        # Add session_id to query params if not present
+        if "session_id" not in request.query_params:
+            # Create a new request with the session_id added
+            # This is a bit hacky but necessary since FastAPI request objects are immutable
+            request.scope["query_string"] = f"session_id={session_id}".encode()
+        
+        # Print request body for debugging (limited to first 200 chars)
+        body = await request.body()
+        body_str = body.decode('utf-8')[:200]
+        print(f"Request body (truncated): {body_str}...")
+        
+        # Use the SseServerTransport's handle_post_message method
+        return await sse_transport.handle_post_message(request)
+    except Exception as e:
+        print(f"Error handling POST request: {e}")
+        return Response(
+            status_code=500,
+            content=f"Error processing request: {str(e)}",
+            media_type="text/plain"
+        )
 
 # Mount the messages endpoint with trailing slash for handling POST requests
 app.mount("/messages/", app=sse_transport.handle_post_message)
