@@ -24,4 +24,4 @@ ENV PYTHONDONTWRITEBYTECODE=1
 EXPOSE 8000
 
 # Command to run the application
-CMD ["python", "minimal_server.py"]
+CMD ["python", "server_sse.py"]
