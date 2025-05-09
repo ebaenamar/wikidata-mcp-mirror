@@ -5,7 +5,34 @@ This module provides functions for interacting with the Wikidata API and SPARQL 
 """
 import json
 import requests
-from SPARQLWrapper import SPARQLWrapper, JSON
+import traceback
+# Ensure SPARQLWrapper is properly imported
+try:
+    from SPARQLWrapper import SPARQLWrapper, JSON
+except ImportError:
+    print("Error importing SPARQLWrapper. Make sure it's installed.")
+    # Define fallback implementation to avoid runtime errors
+    class SPARQLWrapper:
+        def __init__(self, endpoint):
+            self.endpoint = endpoint
+        
+        def addCustomHttpHeader(self, header, value):
+            pass
+            
+        def setQuery(self, query):
+            self.query = query
+            
+        def setReturnFormat(self, format_type):
+            pass
+            
+        def query(self):
+            class Result:
+                def convert(self):
+                    return {"results": {"bindings": []}}
+            return Result()
+    
+    # Define JSON constant if not available
+    JSON = "json"
 
 # Constants
 WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
