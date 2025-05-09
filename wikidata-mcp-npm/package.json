@@ -1,0 +1,14 @@
+{
+  "name": "wikidata-mcp",
+  "version": "1.0.0",
+  "description": "Wikidata MCP Client for Claude Desktop",
+  "bin": {
+    "wikidata-mcp": "./bin/wikidata-mcp.js"
+  },
+  "dependencies": {
+    "mcp-remote": "^0.1.2"
+  },
+  "keywords": ["mcp", "wikidata", "claude", "ai"],
+  "author": "MIT AI Ventures",
+  "license": "MIT"
+}

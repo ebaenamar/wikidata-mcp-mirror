@@ -184,4 +184,11 @@ def execute_sparql(sparql_query: str) -> str:
         results = sparql.query().convert()
         return json.dumps(results["results"]["bindings"])
     except Exception as e:
-        return json.dumps({"error": f"Error executing query: {str(e)}"})
+        error_details = {
+            "error": f"Error executing query: {str(e)}",
+            "query": sparql_query,
+            "error_type": str(type(e).__name__),
+            "traceback": traceback.format_exc()
+        }
+        print(f"SPARQL Error Details:\n{json.dumps(error_details, indent=2)}")
+        return json.dumps(error_details)

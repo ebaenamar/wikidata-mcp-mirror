@@ -117,12 +117,32 @@ def execute_wikidata_sparql(sparql_query: str) -> dict:
         # Convert the result to a dictionary if it's a string (JSON)
         if isinstance(result, str):
             try:
-                return json.loads(result)
+                result_dict = json.loads(result)
+                
+                # Check if the result contains an error
+                if isinstance(result_dict, dict) and 'error' in result_dict:
+                    print(f"SPARQL Query Error: {result_dict}")
+                    
+                    # Enhanced error message with query details
+                    error_msg = result_dict.get('error', 'Unknown error')
+                    error_type = result_dict.get('error_type', 'Unknown error type')
+                    query = result_dict.get('query', 'Query not available')
+                    
+                    # Return a more user-friendly error message
+                    return {
+                        "error": error_msg,
+                        "details": f"Error Type: {error_type}\nQuery: {query}",
+                        "suggestion": "Try simplifying your query or check for syntax errors."
+                    }
+                
+                return result_dict
             except json.JSONDecodeError:
                 return {"result": result}
         return result
     except Exception as e:
         error_message = str(e)
+        print(f"Exception in execute_wikidata_sparql: {error_message}")
+        
         # Provide more helpful error messages for common issues
         if "Lexical error" in error_message and "Encountered: " in error_message:
             return {"error": f"SPARQL syntax error: {error_message}. Check for unescaped quotes or special characters."}
