@@ -10,7 +10,7 @@ import sseclient
 import sys
 
 # URL del servidor MCP
-SERVER_URL = "https://wikidata-mcp.onrender.com"
+SERVER_URL = "https://wikidata-mcp-mirror.onrender.com"
 
 def try_http_first():
     """Intenta la estrategia http-first"""
