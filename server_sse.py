@@ -631,36 +631,19 @@ async def sse_endpoint(request: Request):
         
         print(f"Starting MCP server with session ID: {session_id}")
         try:
-            # Add a longer delay to ensure connection is fully established
-            # This helps prevent the "Received request before initialization was complete" error
-            await asyncio.sleep(2.0)
+            # Add a small delay to ensure connection is fully established
+            await asyncio.sleep(0.5)
             
             # Create initialization options with extended timeout
-            # Use the proper way to create initialization options with the desired settings
-            init_options = mcp._mcp_server.create_initialization_options(
-                timeout_ms=60000,  # 60 seconds timeout for initialization
-                wait_for_initialization=True  # Wait for initialization to complete
+            init_options = mcp._mcp_server.create_initialization_options()
+            init_options["timeoutMs"] = 30000  # 30 seconds timeout for initialization
+            
+            # Run MCP server with proper initialization options
+            await mcp._mcp_server.run(
+                read_stream,
+                write_stream,
+                init_options
             )
-            
-            # Set up a background task to handle the MCP server
-            async def run_mcp_server():
-                try:
-                    await mcp._mcp_server.run(
-                        read_stream,
-                        write_stream,
-                        init_options
-                    )
-                except Exception as e:
-                    print(f"Error in MCP server background task: {e}")
-            
-            # Start the MCP server in the background
-            task = asyncio.create_task(run_mcp_server())
-            
-            # Wait for a short time to ensure initialization starts
-            await asyncio.sleep(1.0)
-            
-            # Continue with the request handling
-            await task
         except RuntimeError as re:
             error_msg = str(re)
             print(f"RuntimeError in MCP server: {error_msg}")
