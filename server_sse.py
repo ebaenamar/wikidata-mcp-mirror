@@ -9,6 +9,7 @@ import json
 import asyncio
 import anyio
 import uvicorn
+import traceback
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
@@ -16,6 +17,7 @@ from mcp.server.sse import SseServerTransport
 from mcp.server.fastmcp import FastMCP
 from datetime import datetime
 from uuid import uuid4
+from SPARQLWrapper import SPARQLWrapper, JSON
 
 from mcp.server.fastmcp.prompts import base
 from starlette.routing import Route, Mount
