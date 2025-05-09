@@ -7,6 +7,7 @@ that connects Large Language Models to Wikidata's structured knowledge base.
 import os
 import json
 import asyncio
+import anyio
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -86,7 +87,7 @@ def get_wikidata_properties(entity_id: str) -> str:
     return json.dumps(properties)
 
 @mcp.tool("execute_wikidata_sparql")
-def execute_sparql(sparql_query: str) -> dict:
+def execute_wikidata_sparql(sparql_query: str) -> dict:
     """
     Execute a SPARQL query against Wikidata.
     
@@ -110,13 +111,16 @@ def execute_sparql(sparql_query: str) -> dict:
             if 'CONTAINS(str(' in sparql_query and '")' in sparql_query:
                 return {"error": "Possible quote issue in CONTAINS. Use single quotes inside double quotes or escape properly."}
         
-        # Execute the query
-        sparql = SPARQLWrapper("https://query.wikidata.org/sparql")
-        sparql.setQuery(sparql_query)
-        sparql.setReturnFormat(JSON)
-        results = sparql.query().convert()
+        # Use the imported execute_sparql function from wikidata_api.py
+        result = execute_sparql(sparql_query)
         
-        return results
+        # Convert the result to a dictionary if it's a string (JSON)
+        if isinstance(result, str):
+            try:
+                return json.loads(result)
+            except json.JSONDecodeError:
+                return {"result": result}
+        return result
     except Exception as e:
         error_message = str(e)
         # Provide more helpful error messages for common issues
@@ -180,14 +184,27 @@ def find_entity_facts(entity_name: str, property_name: str = None) -> str:
         LIMIT 10
         """
     
+    # Get facts using the execute_sparql function
     facts = execute_sparql(sparql_query)
     
+    # Handle the facts based on its type
+    if isinstance(facts, str):
+        try:
+            facts_data = json.loads(facts)
+        except json.JSONDecodeError:
+            facts_data = {"raw": facts}
+    else:
+        facts_data = facts
+    
     # Combine all results
-    return json.dumps({
+    result = {
         "entity": metadata,
         "property": {"id": property_id, "name": property_name} if property_id else None,
-        "facts": json.loads(facts)
-    })
+        "facts": facts_data
+    }
+    
+    # Return as JSON string
+    return json.dumps(result)
 
 @mcp.tool()
 def get_related_entities(entity_id: str, relation_property: str = None, limit: int = 10) -> str:
@@ -229,7 +246,18 @@ def get_related_entities(entity_id: str, relation_property: str = None, limit: i
         LIMIT {limit}
         """
     
-    return execute_sparql(sparql_query)
+    # Get related entities using the execute_sparql function
+    related_entities = execute_sparql(sparql_query)
+    
+    # Handle the result based on its type
+    if isinstance(related_entities, str):
+        try:
+            return related_entities  # Already a JSON string
+        except json.JSONDecodeError:
+            return json.dumps({"raw": related_entities})
+    else:
+        # It's already a dictionary, convert to JSON string
+        return json.dumps(related_entities)
 
 # ============= MCP RESOURCES =============
 
@@ -456,19 +484,34 @@ async def sse_endpoint(request: Request):
         
         print(f"Starting MCP server with session ID: {session_id}")
         try:
-            # Add a small delay to ensure connection is fully established
-            await asyncio.sleep(0.5)
+            # Add a longer delay to ensure connection is fully established
+            # This helps prevent the "Received request before initialization was complete" error
+            await asyncio.sleep(2.0)
             
             # Create initialization options with extended timeout
             init_options = mcp._mcp_server.create_initialization_options()
-            init_options["timeoutMs"] = 30000  # 30 seconds timeout for initialization
+            init_options["timeoutMs"] = 60000  # 60 seconds timeout for initialization
+            init_options["waitForInitialization"] = True  # Wait for initialization to complete
             
-            # Run MCP server with proper initialization options
-            await mcp._mcp_server.run(
-                read_stream,
-                write_stream,
-                init_options
-            )
+            # Set up a background task to handle the MCP server
+            async def run_mcp_server():
+                try:
+                    await mcp._mcp_server.run(
+                        read_stream,
+                        write_stream,
+                        init_options
+                    )
+                except Exception as e:
+                    print(f"Error in MCP server background task: {e}")
+            
+            # Start the MCP server in the background
+            task = asyncio.create_task(run_mcp_server())
+            
+            # Wait for a short time to ensure initialization starts
+            await asyncio.sleep(1.0)
+            
+            # Continue with the request handling
+            await task
         except RuntimeError as re:
             error_msg = str(re)
             print(f"RuntimeError in MCP server: {error_msg}")
@@ -563,7 +606,28 @@ async def post_messages_no_slash(request: Request):
         print(f"Request body (truncated): {body_str}...")
         
         # Use the SseServerTransport's handle_post_message method
-        return await sse_transport.handle_post_message(request)
+        try:
+            # Add a small delay to ensure the SSE connection is ready
+            await asyncio.sleep(0.5)
+            
+            # Handle the message with error catching
+            response = await sse_transport.handle_post_message(request)
+            return response
+        except anyio.BrokenResourceError:
+            # This is a common error when the client disconnects or the stream is broken
+            print(f"BrokenResourceError for session {session_id} - client may have disconnected")
+            return Response(
+                status_code=202,  # Accepted but not processed
+                content="Message received but connection was broken. Please reconnect SSE.",
+                media_type="text/plain"
+            )
+        except Exception as e:
+            print(f"Error in handle_post_message: {e}")
+            return Response(
+                status_code=500,
+                content=f"Error processing request: {str(e)}",
+                media_type="text/plain"
+            )
     except Exception as e:
         print(f"Error handling POST request: {e}")
         return Response(
