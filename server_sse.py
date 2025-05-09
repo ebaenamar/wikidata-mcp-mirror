@@ -151,7 +151,7 @@ def execute_wikidata_sparql(sparql_query: str) -> dict:
         return {"error": f"Error executing SPARQL query: {error_message}"}
 
 @mcp.tool()
-def find_entity_facts(entity_name: str, property_name: str = None) -> dict:
+def find_entity_facts(entity_name: str, property_name: str = None) -> str:
     """
     Search for an entity and find its facts, optionally filtering by a property.
     
@@ -160,12 +160,12 @@ def find_entity_facts(entity_name: str, property_name: str = None) -> dict:
         property_name: Optional name of a property to filter by
         
     Returns:
-        A dictionary containing the entity facts
+        A JSON string containing the entity facts
     """
     # Search for the entity
     entity_id = search_entity(entity_name)
     if entity_id == "No entity found":
-        return {"error": f"No entity found for '{entity_name}'"}
+        return json.dumps({"error": f"No entity found for '{entity_name}'"})
     
     # Get metadata
     metadata = get_entity_metadata(entity_id)
@@ -175,10 +175,10 @@ def find_entity_facts(entity_name: str, property_name: str = None) -> dict:
     if property_name:
         property_id = search_property(property_name)
         if property_id == "No property found":
-            return {
+            return json.dumps({
                 "entity": metadata,
                 "error": f"No property found for '{property_name}'"
-            }
+            })
     
     # Build and execute SPARQL query
     if property_id:
@@ -225,11 +225,11 @@ def find_entity_facts(entity_name: str, property_name: str = None) -> dict:
         "facts": facts_data
     }
     
-    # Return as dictionary
-    return result
+    # Return as JSON string
+    return json.dumps(result)
 
 @mcp.tool()
-def get_related_entities(entity_id: str, relation_property: str = None, limit: int = 10) -> dict:
+def get_related_entities(entity_id: str, relation_property: str = None, limit: int = 10) -> str:
     """
     Find entities related to the given entity, optionally by a specific relation.
     
@@ -239,7 +239,7 @@ def get_related_entities(entity_id: str, relation_property: str = None, limit: i
         limit: Maximum number of results to return
         
     Returns:
-        Dictionary containing related entities
+        JSON string containing related entities
     """
     if relation_property:
         # Query for specific relation
@@ -273,14 +273,14 @@ def get_related_entities(entity_id: str, relation_property: str = None, limit: i
     
     # Handle the result based on its type
     if isinstance(related_entities, str):
-        try:
-            # Convert JSON string to dictionary
-            return json.loads(related_entities)
-        except json.JSONDecodeError:
-            return {"raw": related_entities}
-    else:
-        # It's already a dictionary, return as is
+        # It's already a JSON string, return as is
         return related_entities
+    else:
+        # It's a dictionary, convert to JSON string
+        try:
+            return json.dumps(related_entities)
+        except Exception as e:
+            return json.dumps({"error": f"Error serializing result: {str(e)}", "raw": str(related_entities)})
 
 # ============= MCP RESOURCES =============
 
