@@ -374,12 +374,29 @@ def entity_search_template(entity_name: str) -> list[base.Message]:
     """
     return [
         base.UserMessage(f"""
-You need to find information about {entity_name} in Wikidata.
+You need to find accurate and up-to-date information about {entity_name} using Wikidata as your primary source of truth.
 
-Follow these steps:
-1. First, search for the entity ID using search_wikidata_entity.
-2. Then, get the metadata using get_wikidata_metadata.
-3. Finally, execute a SPARQL query to get detailed information.
+IMPORTANT: Do NOT rely on your pre-trained knowledge about {entity_name}, which may be outdated or incorrect. Instead, use ONLY the data returned from Wikidata tools.
+
+Follow these steps precisely:
+
+1. First, search for the entity ID using search_wikidata_entity with the query "{entity_name}".
+   - If multiple entities are found, analyze which one most likely matches the user's intent.
+   - If no entity is found, try alternative spellings or more specific terms.
+
+2. Once you have the entity ID (e.g., Q12345), get the metadata using get_wikidata_metadata.
+   - This will provide you with the official label and description.
+
+3. Get all properties for this entity using get_wikidata_properties.
+   - This will give you a comprehensive set of facts about the entity.
+
+4. For more specific information, execute a SPARQL query using execute_wikidata_sparql.
+   - Use the common_properties_resource for reference on property IDs.
+   - Refer to sparql_examples_resource for query patterns.
+
+5. When presenting information to the user, cite Wikidata as your source and include the entity ID.
+
+Remember: If the information isn't found in Wikidata, clearly state that you don't have that information rather than falling back to potentially outdated knowledge.
 """)
     ]
 
@@ -390,11 +407,32 @@ def property_search_template(property_name: str) -> list[base.Message]:
     """
     return [
         base.UserMessage(f"""
-You need to find information about the property "{property_name}" in Wikidata.
+You need to find accurate information about the Wikidata property "{property_name}" using only Wikidata's data.
 
-Follow these steps:
-1. First, search for the property ID using search_wikidata_property.
-2. Then, use this property ID in a SPARQL query to find entities with this property.
+IMPORTANT: Do NOT rely on your pre-trained knowledge about properties, as Wikidata's property system is specific and may differ from your training data. Use ONLY the data returned from Wikidata tools.
+
+Follow these steps precisely:
+
+1. First, search for the property ID using search_wikidata_property with the query "{property_name}".
+   - Property IDs in Wikidata always start with 'P' followed by numbers (e.g., P31 for 'instance of').
+   - If no property is found, try alternative terms or check the common_properties_resource.
+
+2. Once you have the property ID (e.g., P31), use it in a SPARQL query with execute_wikidata_sparql to find entities with this property.
+   - Example query structure:
+     ```
+     SELECT ?entity ?entityLabel WHERE {{
+       ?entity wdt:P31 wd:Q5.  # Example: Find humans (Q5) using 'instance of' (P31)
+       SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
+     }}
+     LIMIT 10
+     ```
+   - Replace P31 with your found property ID and adjust the query as needed.
+
+3. Analyze the results to understand how this property is used in Wikidata.
+
+4. When presenting information to the user, explain what the property represents and provide examples of entities that use this property.
+
+Remember: If you cannot find the property in Wikidata, clearly state this rather than making assumptions based on your pre-trained knowledge.
 """)
     ]
 
@@ -405,11 +443,97 @@ def entity_relation_template(entity1_name: str, entity2_name: str) -> list[base.
     """
     return [
         base.UserMessage(f"""
-You need to find the relationship between {entity1_name} and {entity2_name} in Wikidata.
+You need to discover the factual relationships between {entity1_name} and {entity2_name} using Wikidata as your authoritative source.
 
-Follow these steps:
-1. First, search for both entity IDs using search_wikidata_entity.
-2. Then, execute a SPARQL query to find direct or indirect relationships between them.
+IMPORTANT: Do NOT rely on your pre-trained knowledge about these entities or their relationships, which may be outdated, incomplete, or incorrect. Use ONLY the data returned from Wikidata tools.
+
+Follow these steps precisely:
+
+1. First, search for both entity IDs using search_wikidata_entity:
+   - For the first entity: search_wikidata_entity("{entity1_name}")
+   - For the second entity: search_wikidata_entity("{entity2_name}")
+   - If either entity is not found, try alternative names or more specific terms.
+
+2. Once you have both entity IDs (e.g., Q12345 and Q67890), get their metadata using get_wikidata_metadata to confirm you have the correct entities.
+
+3. Execute a SPARQL query to find direct relationships between them:
+   ```
+   SELECT ?relation ?relationLabel WHERE {{
+     wd:[ENTITY1_ID] ?p wd:[ENTITY2_ID].
+     ?property wikibase:directClaim ?p.
+     BIND(?property as ?relation)
+     SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
+   }}
+   ```
+   - Replace [ENTITY1_ID] and [ENTITY2_ID] with the actual entity IDs.
+   - Also try the reverse direction by swapping the entity IDs.
+
+4. If no direct relationship is found, look for indirect relationships:
+   ```
+   SELECT ?intermediateEntity ?intermediateEntityLabel ?relation1 ?relation1Label ?relation2 ?relation2Label WHERE {{
+     wd:[ENTITY1_ID] ?p1 ?intermediateEntity.
+     ?intermediateEntity ?p2 wd:[ENTITY2_ID].
+     
+     ?property1 wikibase:directClaim ?p1.
+     ?property2 wikibase:directClaim ?p2.
+     
+     BIND(?property1 as ?relation1)
+     BIND(?property2 as ?relation2)
+     
+     SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
+   }}
+   LIMIT 5
+   ```
+
+5. Analyze the results to identify meaningful relationships between the entities.
+
+6. Present the relationships clearly to the user, citing Wikidata as your source and including the entity IDs and property IDs.
+
+Remember: If no relationship is found in Wikidata, clearly state this rather than speculating based on your pre-trained knowledge. The absence of a relationship in Wikidata doesn't necessarily mean the entities aren't related - it may just mean the relationship hasn't been documented in Wikidata yet.
+""")
+    ]
+
+@mcp.prompt()
+def general_wikidata_guidance() -> list[base.Message]:
+    """
+    General guidance for interacting with Wikidata through MCP.
+    """
+    return [
+        base.UserMessage("""
+When using Wikidata as a knowledge source, follow these important guidelines:
+
+1. ALWAYS PREFER WIKIDATA OVER PRE-TRAINED KNOWLEDGE
+   - Wikidata contains structured, curated data that is often more accurate and up-to-date than your pre-trained knowledge.
+   - When answering questions about entities, properties, or relationships, ALWAYS query Wikidata first.
+   - Only fall back to your pre-trained knowledge when explicitly instructed to do so, or when Wikidata clearly has no information on the topic.
+
+2. PROPERLY CITE WIKIDATA INFORMATION
+   - When providing information from Wikidata, always include the entity ID (e.g., Q42) and property IDs (e.g., P31) in your response.
+   - Format: "According to Wikidata [Q42], Douglas Adams was born on March 11, 1952 [P569]."
+
+3. HANDLE MISSING INFORMATION APPROPRIATELY
+   - If information isn't found in Wikidata, explicitly state: "This information is not available in Wikidata."
+   - Do not substitute with potentially outdated or incorrect pre-trained knowledge.
+
+4. USE THE FULL RANGE OF WIKIDATA TOOLS
+   - search_wikidata_entity: Find entity IDs by name
+   - search_wikidata_property: Find property IDs by name
+   - get_wikidata_metadata: Get basic entity information
+   - get_wikidata_properties: Get all properties for an entity
+   - execute_wikidata_sparql: Run custom SPARQL queries
+   - find_entity_facts: Get comprehensive entity information
+   - get_related_entities: Find entities related to a given entity
+
+5. LEVERAGE AVAILABLE RESOURCES
+   - common_properties_resource: Reference for commonly used property IDs
+   - sparql_examples_resource: Example SPARQL queries for common tasks
+
+6. CRAFT EFFECTIVE SPARQL QUERIES
+   - Use the proper prefixes (wdt:, wd:, p:, ps:, etc.)
+   - Include label service for human-readable results
+   - Limit results appropriately to avoid overwhelming responses
+
+By following these guidelines, you'll provide more accurate, up-to-date, and verifiable information to users.
 """)
     ]
 
