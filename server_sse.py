@@ -636,9 +636,11 @@ async def sse_endpoint(request: Request):
             await asyncio.sleep(2.0)
             
             # Create initialization options with extended timeout
-            init_options = mcp._mcp_server.create_initialization_options()
-            init_options["timeoutMs"] = 60000  # 60 seconds timeout for initialization
-            init_options["waitForInitialization"] = True  # Wait for initialization to complete
+            # Use the proper way to create initialization options with the desired settings
+            init_options = mcp._mcp_server.create_initialization_options(
+                timeout_ms=60000,  # 60 seconds timeout for initialization
+                wait_for_initialization=True  # Wait for initialization to complete
+            )
             
             # Set up a background task to handle the MCP server
             async def run_mcp_server():

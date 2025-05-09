@@ -1,0 +1,359 @@
+{
+  "head": {
+    "vars": [
+      "president",
+      "presidentLabel",
+      "birthDate",
+      "birthYear",
+      "deathDate",
+      "deathYear"
+    ]
+  },
+  "results": {
+    "bindings": [
+      {
+        "president": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q9640"
+        },
+        "deathDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1973-01-22T00:00:00Z"
+        },
+        "deathYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1973"
+        },
+        "birthDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1908-08-27T00:00:00Z"
+        },
+        "birthYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1908"
+        },
+        "presidentLabel": {
+          "xml:lang": "en",
+          "type": "literal",
+          "value": "Lyndon B. Johnson"
+        }
+      },
+      {
+        "president": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q9960"
+        },
+        "deathDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "2004-06-05T00:00:00Z"
+        },
+        "deathYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "2004"
+        },
+        "birthDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1911-02-06T00:00:00Z"
+        },
+        "birthYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1911"
+        },
+        "presidentLabel": {
+          "xml:lang": "en",
+          "type": "literal",
+          "value": "Ronald Reagan"
+        }
+      },
+      {
+        "president": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q9582"
+        },
+        "deathDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "2006-12-26T00:00:00Z"
+        },
+        "deathYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "2006"
+        },
+        "birthDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1913-07-14T00:00:00Z"
+        },
+        "birthYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1913"
+        },
+        "presidentLabel": {
+          "xml:lang": "en",
+          "type": "literal",
+          "value": "Gerald Ford"
+        }
+      },
+      {
+        "president": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q9588"
+        },
+        "deathDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1994-04-22T00:00:00Z"
+        },
+        "deathYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1994"
+        },
+        "birthDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1913-01-09T00:00:00Z"
+        },
+        "birthYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1913"
+        },
+        "presidentLabel": {
+          "xml:lang": "en",
+          "type": "literal",
+          "value": "Richard Nixon"
+        }
+      },
+      {
+        "president": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q9696"
+        },
+        "deathDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1963-11-22T00:00:00Z"
+        },
+        "deathYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1963"
+        },
+        "birthDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1917-05-29T00:00:00Z"
+        },
+        "birthYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1917"
+        },
+        "presidentLabel": {
+          "xml:lang": "en",
+          "type": "literal",
+          "value": "John F. Kennedy"
+        }
+      },
+      {
+        "president": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q23505"
+        },
+        "deathDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "2018-11-30T00:00:00Z"
+        },
+        "deathYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "2018"
+        },
+        "birthDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1924-06-12T00:00:00Z"
+        },
+        "birthYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1924"
+        },
+        "presidentLabel": {
+          "xml:lang": "en",
+          "type": "literal",
+          "value": "George H. W. Bush"
+        }
+      },
+      {
+        "president": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q23685"
+        },
+        "deathDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "2024-12-29T00:00:00Z"
+        },
+        "deathYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "2024"
+        },
+        "birthDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1924-10-01T00:00:00Z"
+        },
+        "birthYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1924"
+        },
+        "presidentLabel": {
+          "xml:lang": "en",
+          "type": "literal",
+          "value": "Jimmy Carter"
+        }
+      },
+      {
+        "president": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q6279"
+        },
+        "birthDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1942-11-20T00:00:00Z"
+        },
+        "birthYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1942"
+        },
+        "presidentLabel": {
+          "xml:lang": "en",
+          "type": "literal",
+          "value": "Joe Biden"
+        }
+      },
+      {
+        "president": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q1124"
+        },
+        "birthDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1946-08-19T00:00:00Z"
+        },
+        "birthYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1946"
+        },
+        "presidentLabel": {
+          "xml:lang": "en",
+          "type": "literal",
+          "value": "Bill Clinton"
+        }
+      },
+      {
+        "president": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q22686"
+        },
+        "birthDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1946-06-14T00:00:00Z"
+        },
+        "birthYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1946"
+        },
+        "presidentLabel": {
+          "xml:lang": "en",
+          "type": "literal",
+          "value": "Donald Trump"
+        }
+      },
+      {
+        "president": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q207"
+        },
+        "birthDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1946-07-06T00:00:00Z"
+        },
+        "birthYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1946"
+        },
+        "presidentLabel": {
+          "xml:lang": "en",
+          "type": "literal",
+          "value": "George W. Bush"
+        }
+      },
+      {
+        "president": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q5335019"
+        },
+        "birthDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1948-10-27T00:00:00Z"
+        },
+        "birthYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1948"
+        },
+        "presidentLabel": {
+          "xml:lang": "en",
+          "type": "literal",
+          "value": "Ed Kealty"
+        }
+      },
+      {
+        "president": {
+          "type": "uri",
+          "value": "http://www.wikidata.org/entity/Q76"
+        },
+        "birthDate": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+          "type": "literal",
+          "value": "1961-08-04T00:00:00Z"
+        },
+        "birthYear": {
+          "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+          "type": "literal",
+          "value": "1961"
+        },
+        "presidentLabel": {
+          "xml:lang": "en",
+          "type": "literal",
+          "value": "Barack Obama"
+        }
+      }
+    ]
+  }
+}
