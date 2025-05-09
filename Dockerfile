@@ -11,11 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install dependencies with specific commands for SPARQLWrapper
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir --upgrade pip && \
+# Install dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir rdflib && \
     pip install --no-cache-dir SPARQLWrapper==2.0.0 && \
-    python -m pip install --no-cache-dir SPARQLWrapper==2.0.0
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application
 COPY . .

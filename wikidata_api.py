@@ -6,55 +6,9 @@ This module provides functions for interacting with the Wikidata API and SPARQL 
 import json
 import requests
 import traceback
-import sys
 
-# Ensure SPARQLWrapper is properly imported
-try:
-    from SPARQLWrapper import SPARQLWrapper, JSON
-    print("Successfully imported SPARQLWrapper")
-except ImportError as e:
-    print(f"Error importing SPARQLWrapper: {e}")
-    print(f"Python version: {sys.version}")
-    print(f"Python path: {sys.path}")
-    
-    # Try alternative import methods
-    try:
-        import pip
-        print("Attempting to install SPARQLWrapper via pip...")
-        pip.main(['install', 'SPARQLWrapper'])
-        from SPARQLWrapper import SPARQLWrapper, JSON
-        print("Successfully installed and imported SPARQLWrapper")
-    except Exception as e2:
-        print(f"Failed to install SPARQLWrapper: {e2}")
-        
-        # Define fallback implementation to avoid runtime errors
-        print("Using fallback implementation for SPARQLWrapper")
-        class SPARQLWrapper:
-            def __init__(self, endpoint):
-                self.endpoint = endpoint
-                print(f"Fallback SPARQLWrapper initialized with endpoint: {endpoint}")
-            
-            def addCustomHttpHeader(self, header, value):
-                print(f"Adding header {header}: {value}")
-                pass
-                
-            def setQuery(self, query):
-                print(f"Setting query: {query[:100]}...")
-                self.query = query
-                
-            def setReturnFormat(self, format_type):
-                print(f"Setting return format: {format_type}")
-                pass
-                
-            def query(self):
-                print("Executing fallback query (will return empty results)")
-                class Result:
-                    def convert(self):
-                        return {"results": {"bindings": []}}
-                return Result()
-        
-        # Define JSON constant if not available
-        JSON = "json"
+# Import SPARQLWrapper
+from SPARQLWrapper import SPARQLWrapper, JSON
 
 # Constants
 WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
@@ -207,13 +161,6 @@ def execute_sparql(sparql_query: str) -> str:
     Returns:
         JSON-formatted result of the query
     """
-    print(f"Executing SPARQL query: {sparql_query[:100]}...")
-    
-    # Use direct requests to the SPARQL endpoint if SPARQLWrapper is not working
-    if not hasattr(SPARQLWrapper, 'query') or getattr(SPARQLWrapper, 'query', None) is None:
-        print("Using requests fallback for SPARQL query")
-        return execute_sparql_with_requests(sparql_query)
-    
     try:
         sparql = SPARQLWrapper(WIKIDATA_SPARQL_ENDPOINT)
         sparql.addCustomHttpHeader("User-Agent", USER_AGENT)
@@ -234,79 +181,19 @@ def execute_sparql(sparql_query: str) -> str:
         else:
             full_query = sparql_query
         
-        print(f"Setting query with SPARQLWrapper: {full_query[:100]}...")
         sparql.setQuery(full_query)
         sparql.setReturnFormat(JSON)
         
-        print("Executing query with SPARQLWrapper...")
         results = sparql.query().convert()
-        print("Query executed successfully")
-        return json.dumps(results["results"]["bindings"])
-    except Exception as e:
-        print(f"Error with SPARQLWrapper: {e}")
-        print("Falling back to requests method")
-        return execute_sparql_with_requests(sparql_query)
-
-def execute_sparql_with_requests(sparql_query: str) -> str:
-    """
-    Execute a SPARQL query using direct HTTP requests instead of SPARQLWrapper.
-    
-    Args:
-        sparql_query: SPARQL query to execute
-        
-    Returns:
-        JSON-formatted result of the query
-    """
-    try:
-        # Add common prefixes to make queries easier to write
-        prefixes = """
-        PREFIX wd: <http://www.wikidata.org/entity/>
-        PREFIX wdt: <http://www.wikidata.org/prop/direct/>
-        PREFIX p: <http://www.wikidata.org/prop/>
-        PREFIX ps: <http://www.wikidata.org/prop/statement/>
-        PREFIX wikibase: <http://wikiba.se/ontology#>
-        PREFIX bd: <http://www.bigdata.com/rdf#>
-        """
-        
-        # Add prefixes if they're not already in the query
-        if not any(prefix in sparql_query for prefix in ["PREFIX", "prefix"]):
-            full_query = prefixes + sparql_query
-        else:
-            full_query = sparql_query
-            
-        print(f"Executing SPARQL query with requests: {full_query[:100]}...")
-        
-        # Set up the request parameters
-        params = {
-            'query': full_query,
-            'format': 'json'
-        }
-        
-        headers = {
-            'Accept': 'application/sparql-results+json',
-            'User-Agent': USER_AGENT
-        }
-        
-        # Make the request to the SPARQL endpoint
-        response = requests.get(
-            WIKIDATA_SPARQL_ENDPOINT,
-            params=params,
-            headers=headers
-        )
-        
-        # Check if the request was successful
-        response.raise_for_status()
-        
-        # Parse the JSON response
-        results = response.json()
-        print("Query executed successfully with requests")
         return json.dumps(results["results"]["bindings"])
     except Exception as e:
         error_details = {
-            "error": f"Error executing query with requests: {str(e)}",
+            "error": f"Error executing query: {str(e)}",
             "query": sparql_query,
             "error_type": str(type(e).__name__),
             "traceback": traceback.format_exc()
         }
-        print(f"SPARQL Error Details:\n{json.dumps(error_details, indent=2)}")
+        print(f"SPARQL Error Details: {json.dumps(error_details, indent=2)}")
         return json.dumps(error_details)
+
+
