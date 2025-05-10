@@ -185,7 +185,8 @@ def execute_sparql(sparql_query: str) -> str:
         sparql.setReturnFormat(JSON)
         
         results = sparql.query().convert()
-        return json.dumps(results["results"]["bindings"])
+        # Return the full results structure, not just the bindings
+        return json.dumps(results)
     except Exception as e:
         error_details = {
             "error": f"Error executing query: {str(e)}",

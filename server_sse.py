@@ -89,7 +89,7 @@ def get_wikidata_properties(entity_id: str) -> str:
     return json.dumps(properties)
 
 @mcp.tool("execute_wikidata_sparql")
-def execute_wikidata_sparql(sparql_query: str) -> dict:
+def execute_wikidata_sparql(sparql_query: str) -> str:
     """
     Execute a SPARQL query against Wikidata.
     
@@ -102,16 +102,16 @@ def execute_wikidata_sparql(sparql_query: str) -> dict:
     try:
         # Validate the query for common syntax errors
         if '"' in sparql_query and not sparql_query.count('"') % 2 == 0:
-            return {"error": "Unbalanced double quotes in SPARQL query"}
+            return json.dumps({"error": "Unbalanced double quotes in SPARQL query"})
         
         if "'" in sparql_query and not sparql_query.count("'") % 2 == 0:
-            return {"error": "Unbalanced single quotes in SPARQL query"}
+            return json.dumps({"error": "Unbalanced single quotes in SPARQL query"})
         
         # Check for common syntax issues with FILTER
         if 'FILTER(' in sparql_query and 'CONTAINS' in sparql_query:
             # Check for potential issues with quotes in CONTAINS
             if 'CONTAINS(str(' in sparql_query and '")' in sparql_query:
-                return {"error": "Possible quote issue in CONTAINS. Use single quotes inside double quotes or escape properly."}
+                return json.dumps({"error": "Possible quote issue in CONTAINS. Use single quotes inside double quotes or escape properly."})
         
         # Use the imported execute_sparql function from wikidata_api.py
         result = execute_sparql(sparql_query)
@@ -130,16 +130,18 @@ def execute_wikidata_sparql(sparql_query: str) -> dict:
                     error_type = result_dict.get('error_type', 'Unknown error type')
                     query = result_dict.get('query', 'Query not available')
                     
-                    # Return a more user-friendly error message
-                    return {
+                    # Return a more user-friendly error message as JSON string
+                    return json.dumps({
                         "error": error_msg,
                         "details": f"Error Type: {error_type}\nQuery: {query}",
                         "suggestion": "Try simplifying your query or check for syntax errors."
-                    }
+                    })
                 
-                return result_dict
+                # Return the result dictionary as a JSON string
+                return result
             except json.JSONDecodeError:
-                return {"result": result}
+                return json.dumps({"result": result})
+        # The result is already a JSON string from execute_sparql
         return result
     except Exception as e:
         error_message = str(e)
@@ -147,8 +149,8 @@ def execute_wikidata_sparql(sparql_query: str) -> dict:
         
         # Provide more helpful error messages for common issues
         if "Lexical error" in error_message and "Encountered: " in error_message:
-            return {"error": f"SPARQL syntax error: {error_message}. Check for unescaped quotes or special characters."}
-        return {"error": f"Error executing SPARQL query: {error_message}"}
+            return json.dumps({"error": f"SPARQL syntax error: {error_message}. Check for unescaped quotes or special characters."})
+        return json.dumps({"error": f"Error executing SPARQL query: {error_message}"})
 
 @mcp.tool()
 def find_entity_facts(entity_name: str, property_name: str = None) -> str:
