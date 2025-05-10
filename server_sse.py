@@ -393,6 +393,35 @@ def sparql_examples_resource():
 # ============= PROMPT TEMPLATES =============
 
 @mcp.prompt()
+def position_holders_template(position_name: str, limit: int = 3) -> list[base.Message]:
+    """
+    Template for finding people who held a specific position, ordered by recency.
+    """
+    return [
+        base.UserMessage(f"""
+You need to find the {limit} most recent holders of the position "{position_name}" in Wikidata.
+
+Follow these steps:
+1. First, search for the position ID using search_wikidata_property.
+2. Then, craft a SPARQL query to find people who held this position, ordered by start date (most recent first).
+3. Use the following SPARQL pattern as a guide:
+
+```
+SELECT ?person ?personLabel ?startDate WHERE {{
+  ?person p:P39 [
+    ps:P39 wd:Q<position_id>;  # position held: <position>
+    pq:P580 ?startDate  # start time
+  ].
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
+}} ORDER BY DESC(?startDate) LIMIT {limit}
+```
+
+4. Execute this query using execute_wikidata_sparql.
+5. Format the results in a clear, readable way.
+""")
+    ]
+
+@mcp.prompt()
 def entity_search_template(entity_name: str) -> list[base.Message]:
     """
     Template for searching a Wikidata entity.
@@ -557,6 +586,44 @@ When using Wikidata as a knowledge source, follow these important guidelines:
    - Use the proper prefixes (wdt:, wd:, p:, ps:, etc.)
    - Include label service for human-readable results
    - Limit results appropriately to avoid overwhelming responses
+
+7. HANDLE COMPLEX QUERIES EFFECTIVELY
+   - For temporal queries ("last 3 X", "current X"), use SPARQL with ORDER BY and LIMIT
+   - For list queries, use appropriate entity and property IDs (e.g., Pope = Q19546, position held = P39)
+   - For relationship queries, use properties like P1365 (replaces) and P1366 (replaced by)
+   - For statistical queries, use aggregation functions (COUNT, AVG, MAX, etc.)
+
+8. COMMON QUERY PATTERNS
+   - List of people with a position: ?person wdt:P39 wd:Q<position_id>
+   - Current holders of a position: Add filters for end date or lack thereof
+   - Last N holders: Add ORDER BY DESC(?startDate) LIMIT N
+   - Temporal relationships: Use qualifiers like pq:P580 (start time) and pq:P582 (end time)
+
+9. EXAMPLE SPARQL PATTERNS FOR COMMON QUERIES:
+   - Last 3 popes:
+     ```
+     SELECT ?pope ?popeLabel ?startDate WHERE {
+       ?pope p:P39 [
+         ps:P39 wd:Q19546;  # position held: pope
+         pq:P580 ?startDate  # start time
+       ].
+       SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+     } ORDER BY DESC(?startDate) LIMIT 3
+     ```
+   
+   - Current heads of state:
+     ```
+     SELECT ?person ?personLabel ?country ?countryLabel WHERE {
+       ?country wdt:P31 wd:Q6256.  # instance of: country
+       ?person p:P39 [
+         ps:P39 ?position;
+         pq:P580 ?start
+       ].
+       ?position wdt:P279* wd:Q48352.  # subclass of: head of state
+       FILTER NOT EXISTS { ?person p:P39/pq:P582 ?end }  # No end date
+       SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+     }
+     ```
 
 By following these guidelines, you'll provide more accurate, up-to-date, and verifiable information to users.
 """)
