@@ -1,5 +1,6 @@
 import json
 import os
+import datetime
 from typing import Dict, Any, Optional
 from .query_signals import QuerySignal
 
@@ -22,19 +23,61 @@ class TemporalSpecialist:
     def handle_query(self, signal: QuerySignal) -> Dict[str, Any]:
         """
         Handles queries with temporal constraints.
+        
+        Args:
+            signal: The query signal containing the analyzed query information
+            
+        Returns:
+            A dictionary with the query results
         """
+        # Get the current date from the signal for temporal context
+        current_date = signal.current_date
+        current_date_str = current_date.isoformat()
+        
+        # Add current date information to the response
+        result_metadata = {
+            "metadata": {
+                "current_date": current_date_str,
+                "query_processed_on": datetime.datetime.now().isoformat()
+            }
+        }
+        
         # Example: "last 3 popes"
         if "Q9951" in signal.entities and signal.limit_constraints:  # Pope
-            pattern = self.config["queryPatterns"]["last_n_position_holders"]
-            sparql = pattern["sparqlTemplate"].format(
-                position="Q9951",  # Pope
-                limit=signal.limit_constraints
-            )
+            # Choose the appropriate template based on the query type
+            if "current" in signal.message.lower():
+                pattern = self.config["queryPatterns"]["current_position_holders"]
+                sparql = pattern["sparqlTemplate"].format(
+                    position="Q9951",  # Pope
+                    limit=signal.limit_constraints,
+                    current_date=current_date_str
+                )
+            else:
+                pattern = self.config["queryPatterns"]["last_n_position_holders"]
+                sparql = pattern["sparqlTemplate"].format(
+                    position="Q9951",  # Pope
+                    limit=signal.limit_constraints
+                )
+                
+                # Add a filter to exclude future dates based on current date
+                sparql = sparql.replace("ORDER BY DESC(?startDate)", 
+                                     f"FILTER(?startDate <= \"{current_date_str}\"^^xsd:date) " + 
+                                     "ORDER BY DESC(?startDate)")
             try:
                 result = self.execute_sparql(sparql)
-                return json.loads(result) if isinstance(result, str) else result
+                result_data = json.loads(result) if isinstance(result, str) else result
+                
+                # Add the current date metadata to the result
+                if isinstance(result_data, dict):
+                    result_data.update(result_metadata)
+                
+                return result_data
             except Exception as e:
-                return {"error": f"Error executing SPARQL query: {str(e)}"}
+                error_result = {"error": f"Error executing SPARQL query: {str(e)}"}
+                error_result.update(result_metadata)
+                return error_result
         
         # Implement more cases...
-        return {"error": "Could not process temporal query"}
+        error_result = {"error": "Could not process temporal query"}
+        error_result.update(result_metadata)
+        return error_result

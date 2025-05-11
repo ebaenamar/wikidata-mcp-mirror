@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import datetime
 from typing import Dict, List, Optional, Any
 from .query_signals import QuerySignal
 
@@ -12,10 +13,20 @@ class QueryAnalyzer:
         with open(self.config_path, "r") as f:
             self.config = json.load(f)
     
-    def analyze(self, query_text: str) -> QuerySignal:
+    def analyze(self, query_text: str, current_date: datetime.date = None) -> QuerySignal:
         """
         Analyzes a natural language query and creates a query signal.
+        
+        Args:
+            query_text: The natural language query text
+            current_date: Optional current date for temporal context (defaults to today)
+        
+        Returns:
+            A QuerySignal object representing the analyzed query
         """
+        # Use the provided date or default to today
+        current_date = current_date or datetime.date.today()
+        
         # Basic implementation - in a real version we would use more advanced NLP
         query_type = "generic_query"
         entities = []
@@ -42,5 +53,6 @@ class QueryAnalyzer:
             entities=entities,
             temporal_constraints=temporal_constraints,
             limit_constraints=limit_constraints,
-            message=f"Consulta: {query_text}"
+            message=f"Query: {query_text}",
+            current_date=current_date
         )

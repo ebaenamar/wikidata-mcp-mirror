@@ -1,4 +1,5 @@
 import time
+import datetime
 from typing import Dict, List, Optional, Any
 
 class QuerySignal:
@@ -10,6 +11,7 @@ class QuerySignal:
         limit_constraints: Optional[int] = None,
         strength: float = 1.0,
         message: str = "",
+        current_date: Optional[datetime.date] = None,
     ):
         self.id = f"query_{int(time.time())}_{query_type}"
         self.query_type = query_type
@@ -19,6 +21,8 @@ class QuerySignal:
         self.strength = strength
         self.message = message
         self.timestamp_created = time.time()
+        # Store the current date for temporal context
+        self.current_date = current_date or datetime.date.today()
         
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -29,6 +33,7 @@ class QuerySignal:
             "limit_constraints": self.limit_constraints,
             "strength": self.strength,
             "message": self.message,
+            "current_date": self.current_date.isoformat(),
             "timestamp_created": self.timestamp_created
         }
         
