@@ -1,12 +1,12 @@
 {
   "signalTypes": {
     "temporal_query": {
-      "description": "Consultas con restricciones temporales",
-      "examples": ["últimos 3 papas"]
+      "description": "Queries with temporal constraints",
+      "examples": ["last 3 popes"]
     }
   },
   "commonEntities": {
-    "papa": "Q9951"
+    "pope": "Q9951"
   },
   "queryPatterns": {
     "last_n_position_holders": {

@@ -7,11 +7,11 @@ orchestrator = QueryOrchestrator()
 
 def process_natural_language_query(query_text: str) -> str:
     """
-    Procesa una consulta en lenguaje natural y devuelve los resultados como JSON.
+    Processes a natural language query and returns the results as JSON.
     """
     try:
         results = orchestrator.process_query(query_text)
         return json.dumps(results)
     except Exception as e:
-        error_message = f"Error al procesar la consulta: {str(e)}"
+        error_message = f"Error processing query: {str(e)}"
         return json.dumps({"error": error_message})

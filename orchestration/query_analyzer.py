@@ -14,25 +14,25 @@ class QueryAnalyzer:
     
     def analyze(self, query_text: str) -> QuerySignal:
         """
-        Analiza una consulta en lenguaje natural y crea una seu00f1al de consulta.
+        Analyzes a natural language query and creates a query signal.
         """
-        # Implementaciu00f3n bu00e1sica - en una versiu00f3n real usaru00edamos NLP mu00e1s avanzado
+        # Basic implementation - in a real version we would use more advanced NLP
         query_type = "generic_query"
         entities = []
         temporal_constraints = {}
         limit_constraints = None
         
-        # Detectar consultas temporales
-        temporal_keywords = ["último", "últimos", "primero", "primeros", "reciente", "antiguo"]
+        # Detect temporal queries
+        temporal_keywords = ["last", "latest", "first", "recent", "oldest", "newest", "current"]
         if any(keyword in query_text.lower() for keyword in temporal_keywords):
             query_type = "temporal_query"
             
-            # Intentar extraer lu00edmite numu00e9rico
+            # Try to extract numeric limit
             num_match = re.search(r'\b(\d+)\b', query_text)
             if num_match:
                 limit_constraints = int(num_match.group(1))
         
-        # Detectar entidades
+        # Detect entities
         for entity_name, entity_id in self.config.get("commonEntities", {}).items():
             if entity_name in query_text.lower():
                 entities.append(entity_id)

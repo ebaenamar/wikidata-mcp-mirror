@@ -54,10 +54,10 @@ class QueryOrchestrator:
     
     def _handle_generic_query(self, signal: QuerySignal) -> Dict[str, Any]:
         """
-        Maneja consultas genu00e9ricas que no encajan en otras categoru00edas.
+        Handles generic queries that don't fit into other categories.
         """
         return {
-            "warning": "Consulta no especializada",
+            "warning": "Non-specialized query",
             "query_type": signal.query_type,
             "message": signal.message
         }

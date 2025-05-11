@@ -1,11 +1,11 @@
 """
-Este módulo contiene las modificaciones necesarias para integrar el orquestador
-de consultas con el servidor MCP existente.
+This module contains the necessary modifications to integrate the query orchestrator
+with the existing MCP server.
 
-Instrucciones de integración:
-1. Importar este módulo en server_sse.py
-2. Modificar la función execute_wikidata_sparql para usar process_natural_language_query
-   cuando la consulta no sea SPARQL directa.
+Integration instructions:
+1. Import this module in server_sse.py
+2. Modify the execute_wikidata_sparql function to use process_natural_language_query
+   when the query is not direct SPARQL.
 """
 
 import json
@@ -13,7 +13,7 @@ from .mcp_integration import process_natural_language_query
 
 def is_sparql_query(query: str) -> bool:
     """
-    Determina si una consulta es SPARQL o lenguaje natural.
+    Determines if a query is SPARQL or natural language.
     """
     query = query.strip().upper()
     return (query.startswith("SELECT") or 
@@ -23,19 +23,19 @@ def is_sparql_query(query: str) -> bool:
 
 def enhanced_execute_wikidata_sparql(original_function):
     """
-    Decorador que mejora la función execute_wikidata_sparql para manejar
-    consultas en lenguaje natural.
+    Decorator that enhances the execute_wikidata_sparql function to handle
+    natural language queries.
     """
     def wrapper(sparql_query: str) -> str:
         try:
-            # Si es una consulta SPARQL directa, ejecutarla normalmente
+            # If it's a direct SPARQL query, execute it normally
             if is_sparql_query(sparql_query):
                 return original_function(sparql_query)
             
-            # Si no es SPARQL, procesarla como lenguaje natural
+            # If it's not SPARQL, process it as natural language
             return process_natural_language_query(sparql_query)
         except Exception as e:
-            error_message = f"Error al ejecutar la consulta: {str(e)}"
+            error_message = f"Error executing query: {str(e)}"
             return json.dumps({"error": error_message})
     
     return wrapper

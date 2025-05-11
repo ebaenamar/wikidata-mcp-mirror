@@ -6,38 +6,38 @@ from orchestration.mcp_integration import process_natural_language_query
 class TestMCPIntegration(unittest.TestCase):
     @patch('orchestration.query_orchestrator.QueryOrchestrator.process_query')
     def test_process_natural_language_query(self, mock_process_query):
-        # Configurar el mock para devolver un resultado simulado
+        # Configure the mock to return a simulated result
         mock_result = {
             "results": {
                 "bindings": [
-                    {"itemLabel": {"value": "Francisco"}},
-                    {"itemLabel": {"value": "Benedicto XVI"}},
-                    {"itemLabel": {"value": "Juan Pablo II"}}
+                    {"itemLabel": {"value": "Francis"}},
+                    {"itemLabel": {"value": "Benedict XVI"}},
+                    {"itemLabel": {"value": "John Paul II"}}
                 ]
             }
         }
         mock_process_query.return_value = mock_result
         
-        # Procesar una consulta
-        result_json = process_natural_language_query("últimos 3 papas")
+        # Process a query
+        result_json = process_natural_language_query("last 3 popes")
         result = json.loads(result_json)
         
-        # Verificar que se llamó al orquestador
-        mock_process_query.assert_called_once_with("últimos 3 papas")
+        # Verify that the orchestrator was called
+        mock_process_query.assert_called_once_with("last 3 popes")
         
-        # Verificar que el resultado es el esperado
+        # Verify that the result is as expected
         self.assertEqual(result, mock_result)
     
     @patch('orchestration.query_orchestrator.QueryOrchestrator.process_query')
     def test_process_query_with_error(self, mock_process_query):
-        # Configurar el mock para lanzar una excepción
-        mock_process_query.side_effect = Exception("Error de prueba")
+        # Configure the mock to throw an exception
+        mock_process_query.side_effect = Exception("Test error")
         
-        # Procesar una consulta que generará un error
-        result_json = process_natural_language_query("consulta con error")
+        # Process a query that will generate an error
+        result_json = process_natural_language_query("query with error")
         result = json.loads(result_json)
         
-        # Verificar que se manejó el error correctamente
+        # Verify that the error was handled correctly
         self.assertIn("error", result)
 
 if __name__ == "__main__":

@@ -29,6 +29,9 @@ from wikidata_api import (
     execute_sparql
 )
 
+# Importar el sistema de orquestación
+from orchestration.server_integration import enhanced_execute_wikidata_sparql
+
 # Initialize FastMCP
 mcp = FastMCP(name="Wikidata Knowledge")
 
@@ -88,8 +91,8 @@ def get_wikidata_properties(entity_id: str) -> str:
     properties = get_entity_properties(entity_id)
     return json.dumps(properties)
 
-@mcp.tool("execute_wikidata_sparql")
-def execute_wikidata_sparql(sparql_query: str) -> str:
+# Definir la función original
+def original_execute_wikidata_sparql(sparql_query: str) -> str:
     """
     Execute a SPARQL query against Wikidata.
     
@@ -151,6 +154,22 @@ def execute_wikidata_sparql(sparql_query: str) -> str:
         if "Lexical error" in error_message and "Encountered: " in error_message:
             return json.dumps({"error": f"SPARQL syntax error: {error_message}. Check for unescaped quotes or special characters."})
         return json.dumps({"error": f"Error executing SPARQL query: {error_message}"})
+
+# Aplicar el decorador para mejorar la función con capacidades de lenguaje natural
+@mcp.tool("execute_wikidata_sparql")
+def execute_wikidata_sparql(sparql_query: str) -> str:
+    """
+    Execute a SPARQL query against Wikidata or process a natural language query.
+    
+    Args:
+        sparql_query: The SPARQL query to execute or a natural language query.
+        
+    Returns:
+        The results of the query.
+    """
+    # Usar el decorador para mejorar la función
+    enhanced_function = enhanced_execute_wikidata_sparql(original_execute_wikidata_sparql)
+    return enhanced_function(sparql_query)
 
 @mcp.tool()
 def find_entity_facts(entity_name: str, property_name: str = None) -> str:
