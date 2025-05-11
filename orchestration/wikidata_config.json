@@ -1,0 +1,17 @@
+{
+  "signalTypes": {
+    "temporal_query": {
+      "description": "Consultas con restricciones temporales",
+      "examples": ["últimos 3 papas"]
+    }
+  },
+  "commonEntities": {
+    "papa": "Q9951"
+  },
+  "queryPatterns": {
+    "last_n_position_holders": {
+      "sparqlTemplate": "SELECT ?item ?itemLabel ?startDate ?endDate WHERE {{ ?item wdt:P39 wd:{position} . ?item p:P39 ?statement . ?statement ps:P39 wd:{position} . OPTIONAL {{ ?statement pq:P580 ?startDate . }} OPTIONAL {{ ?statement pq:P582 ?endDate . }} SERVICE wikibase:label {{ bd:serviceParam wikibase:language \"[AUTO_LANGUAGE],es,en\". }} }} ORDER BY DESC(?startDate) LIMIT {limit}",
+      "parameters": ["position", "limit"]
+    }
+  }
+}
