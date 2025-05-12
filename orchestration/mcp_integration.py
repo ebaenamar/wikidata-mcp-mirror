@@ -2,9 +2,11 @@ import json
 import datetime
 from typing import Dict, Any, Optional
 from .query_orchestrator import QueryOrchestrator
+from .query_feedback import QueryFeedback
 
-# Inicializar el orquestador de consultas
-orchestrator = QueryOrchestrator()
+# Inicializar el orquestador de consultas y el sistema de feedback
+orchestrator = QueryOrchestrator(use_feedback=True)
+feedback_system = QueryFeedback()
 
 def process_natural_language_query(query_text: str, current_date: Optional[datetime.date] = None) -> str:
     """
@@ -21,8 +23,8 @@ def process_natural_language_query(query_text: str, current_date: Optional[datet
         # Use the provided date or default to today
         current_date = current_date or datetime.date.today()
         
-        # Add current date metadata to the response
-        results = orchestrator.process_query(query_text)
+        # Pass the current date to the orchestrator
+        results = orchestrator.process_query(query_text, current_date)
         
         # Add current date information to the response if not already present
         if isinstance(results, dict) and "metadata" not in results:

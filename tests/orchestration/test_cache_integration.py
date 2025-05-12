@@ -35,7 +35,13 @@ class TestCacheIntegration(unittest.TestCase):
         # Segunda consulta (hit de caché)
         result2 = new_orchestrator.process_query(query)
         
-        # Verificar que los resultados son iguales
+        # Verificar que los resultados son iguales, ignorando campos dinámicos como timestamps
+        # Eliminar los campos dinámicos antes de comparar
+        if 'metadata' in result1 and 'query_processed_on' in result1['metadata']:
+            del result1['metadata']['query_processed_on']
+        if 'metadata' in result2 and 'query_processed_on' in result2['metadata']:
+            del result2['metadata']['query_processed_on']
+            
         self.assertEqual(result1, result2)
     
     def test_cache_disabled(self):
