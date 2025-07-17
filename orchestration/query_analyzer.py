@@ -13,7 +13,7 @@ class QueryAnalyzer:
         with open(self.config_path, "r") as f:
             self.config = json.load(f)
     
-    def analyze(self, query_text: str, current_date: datetime.date = None) -> QuerySignal:
+    def analyze(self, query_text: str, current_date: datetime.date = None, vector_entities: Optional[List[Dict]] = None) -> QuerySignal:
         """
         Analyzes a natural language query and creates a query signal.
         
@@ -43,9 +43,16 @@ class QueryAnalyzer:
             if num_match:
                 limit_constraints = int(num_match.group(1))
         
-        # Detect entities
+        # Detect entities from vector search results
+        if vector_entities:
+            for entity in vector_entities:
+                entity_id = entity.get('id') or entity.get('entity_id')
+                if entity_id and entity_id not in entities:
+                    entities.append(entity_id)
+
+        # Fallback to keyword-based entity detection
         for entity_name, entity_id in self.config.get("commonEntities", {}).items():
-            if entity_name in query_text.lower():
+            if entity_name in query_text.lower() and entity_id not in entities:
                 entities.append(entity_id)
         
         return QuerySignal(

@@ -6,10 +6,11 @@ from .query_analyzer import QueryAnalyzer
 from .temporal_specialist import TemporalSpecialist
 from .query_signals import QuerySignal
 from .wikidata_cache import WikidataCache
-from .query_feedback import QueryFeedback
+from wikidata_mcp.orchestration.query_feedback import QueryFeedback
+from .wikidata_vectordb_client import WikidataVectorDBClient
 
 class QueryOrchestrator:
-    def __init__(self, config_path: str = None, use_cache: bool = True, use_feedback: bool = True):
+    def __init__(self, config_path: str = None, use_cache: bool = True, use_feedback: bool = True, use_vector_db: bool = True):
         self.config_path = config_path or os.path.join(
             os.path.dirname(__file__), "wikidata_config.json"
         )
@@ -21,10 +22,21 @@ class QueryOrchestrator:
         if use_cache:
             self.cache = WikidataCache()
         
+
+        
+        # Inicializar el cliente de la base de datos de vectores
+        self.use_vector_db = use_vector_db
+        self.vector_db_client = None
+        if self.use_vector_db:
+            api_key = os.environ.get("WIKIDATA_VECTORDB_API_KEY")
+            if not api_key:
+                raise ValueError("WIKIDATA_VECTORDB_API_KEY environment variable not set.")
+            self.vector_db_client = WikidataVectorDBClient(api_key=api_key)
+
         # Inicializar el sistema de feedback
         self.use_feedback = use_feedback
         if use_feedback:
-            self.feedback = QueryFeedback()
+            self.feedback = QueryFeedback(vector_db_client=self.vector_db_client)
         
         # Registrar especialistas
         self.specialists = {
@@ -124,8 +136,17 @@ class QueryOrchestrator:
         Returns:
             A dictionary containing the query results
         """
+        # Use vector DB to find relevant entities
+        vector_entities = None
+        if self.use_vector_db:
+            try:
+                vector_entities = self.vector_db_client.search_entities(query_text)
+            except Exception as e:
+                # Log or handle the error appropriately
+                print(f"Error searching entities in vector DB: {e}")
+
         # Analyze the query to create a signal with current date context
-        signal = self.analyzer.analyze(query_text, current_date)
+        signal = self.analyzer.analyze(query_text, current_date, vector_entities=vector_entities)
         
         # Delegate to a specialist based on the query type
         result = None

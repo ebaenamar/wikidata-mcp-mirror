@@ -3,13 +3,15 @@ import os
 import time
 import datetime
 from typing import Dict, Any, List, Optional
+from .wikidata_vectordb_client import WikidataVectorDBClient
 
 class QueryFeedback:
-    def __init__(self, feedback_file: str = None):
+    def __init__(self, feedback_file: str = None, vector_db_client: Optional[WikidataVectorDBClient] = None):
         self.feedback_file = feedback_file or os.path.join(
             os.path.dirname(__file__), "query_feedback.json"
         )
         self.feedback_data = self._load_feedback()
+        self.vector_db_client = vector_db_client
         
     def _load_feedback(self) -> Dict[str, Any]:
         """
@@ -210,25 +212,31 @@ class QueryFeedback:
     
     def _find_similar_queries(self, query_text: str) -> List[str]:
         """
-        Find queries similar to the given query based on patterns.
+        Find similar queries using the vector database if available.
         """
-        # This is a simplified implementation - in a real system, use more advanced similarity metrics
-        similar_queries = []
-        words = set(query_text.lower().split())
-        
-        # Check all failed queries for similarity
-        for query_hash, query_data in self.feedback_data["failed_queries"].items():
-            other_query = query_data["query"]
-            other_words = set(other_query.lower().split())
+        if not self.vector_db_client:
+            return []
+
+        try:
+            # First, find entities in the query
+            entities = self.vector_db_client.search_entities(query_text, limit=1)
+            if not entities:
+                return []
+
+            # Then, find entities similar to the top entity
+            top_entity_id = entities[0].get('id') or entities[0].get('entity_id')
+            if not top_entity_id:
+                return []
+
+            similar_entities = self.vector_db_client.find_similar_entities(top_entity_id, limit=3)
             
-            # Calculate Jaccard similarity
-            intersection = len(words.intersection(other_words))
-            union = len(words.union(other_words))
-            
-            if union > 0 and intersection / union > 0.5:  # Threshold for similarity
-                similar_queries.append(other_query)
-        
-        return similar_queries
+            # Construct new queries based on the labels of similar entities
+            # This is a simple approach; a more advanced version might try to preserve the query structure
+            return [entity.get('label', '') for entity in similar_entities if entity.get('label')]
+        except Exception as e:
+            # Log or handle the error appropriately
+            print(f"Error finding similar queries in vector DB: {e}")
+            return []
     
     def _adapt_correction(self, original_query: str, similar_query: str, correction: str) -> str:
         """
