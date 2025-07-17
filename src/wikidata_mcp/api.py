@@ -34,6 +34,21 @@ async def health_check():
         "environment": os.getenv("ENVIRONMENT", "development")
     }
 
+# Query endpoint for testing orchestration
+@app.post("/query")
+async def query_wikidata(request: dict):
+    """Query endpoint for testing the orchestration system."""
+    try:
+        from .orchestration.mcp_integration import process_natural_language_query
+        query = request.get("query", "")
+        if not query:
+            raise HTTPException(status_code=400, detail="Query parameter is required")
+        
+        result = process_natural_language_query(query)
+        return {"result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Main endpoint for MCP communication
 @app.get("/messages/")
 async def get_messages():

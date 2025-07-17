@@ -9,18 +9,15 @@ import json
 import asyncio
 import anyio
 import uvicorn
-import traceback
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response
 from mcp.server.sse import SseServerTransport
 from mcp.server.fastmcp import FastMCP
 from datetime import datetime
 from uuid import uuid4
-from SPARQLWrapper import SPARQLWrapper, JSON
 
 from mcp.server.fastmcp.prompts import base
-from starlette.routing import Route, Mount
 from wikidata_api import (
     search_entity,
     search_property,
@@ -29,8 +26,19 @@ from wikidata_api import (
     execute_sparql
 )
 
-# Importar el sistema de orquestación
-from orchestration.server_integration import enhanced_execute_wikidata_sparql
+# Importar el sistema de orquestación para consultas complejas (condicional)
+try:
+    from wikidata_mcp.orchestration.mcp_integration import process_natural_language_query
+    ORCHESTRATION_AVAILABLE = True
+except (ImportError, ValueError) as e:
+    print(f"Warning: Advanced orchestration not available: {e}")
+    ORCHESTRATION_AVAILABLE = False
+    def process_natural_language_query(query):
+        return json.dumps({
+            "error": "Advanced orchestration not available. Set WIKIDATA_VECTORDB_API_KEY environment variable.",
+            "query": query,
+            "success": False
+        })
 
 # Initialize FastMCP
 mcp = FastMCP(name="Wikidata Knowledge")
@@ -38,9 +46,50 @@ mcp = FastMCP(name="Wikidata Knowledge")
 # ============= MCP TOOLS =============
 
 @mcp.tool()
+def query_wikidata_complex(query: str) -> str:
+    """
+    Process complex natural language queries using Vector DB + SPARQL orchestration.
+    
+    ⚠️  PERFORMANCE: 1-11s latency (50x slower than basic tools for simple queries)
+    ⚠️  REQUIRES: WIKIDATA_VECTORDB_API_KEY environment variable
+    ✅  USE FOR: Temporal queries, complex relationships, multi-entity queries
+    ❌  NEVER USE FOR: Simple entity searches, single property lookups
+    
+    Examples of APPROPRIATE use cases:
+    - "last 3 popes" (1.3s)
+    - "recent presidents of France" (1.5s)
+    - "who was pope in 1978" (7.8s)
+    - "Nobel Prize winners in Physics from Germany"
+    
+    Examples of INAPPROPRIATE use cases (use basic tools instead):
+    - "Albert Einstein" (11s vs 250ms with basic tool)
+    - "Paris" (9s vs 166ms with basic tool)
+    
+    Args:
+        query: A complex natural language query requiring temporal/relational analysis
+        
+    Returns:
+        JSON string containing the query results with metadata
+    """
+    try:
+        result = process_natural_language_query(query)
+        return result
+    except Exception as e:
+        return json.dumps({
+            "error": f"Error processing natural language query: {str(e)}",
+            "success": False,
+            "query": query
+        })
+
+@mcp.tool()
 def search_wikidata_entity(query: str) -> str:
     """
-    Search for a Wikidata entity by name.
+    ⚡ FAST: Search for a Wikidata entity by name (140-250ms average).
+    
+    ✅  BEST FOR: Simple entity lookups, getting QIDs for known entities
+    ❌  NOT FOR: Complex queries, temporal questions, relationships
+    
+    PERFORMANCE: 50x faster than complex tool for simple entity searches
     
     Args:
         query: The name of the entity to search for (e.g., "Albert Einstein")
@@ -91,217 +140,32 @@ def get_wikidata_properties(entity_id: str) -> str:
     properties = get_entity_properties(entity_id)
     return json.dumps(properties)
 
-# Definir la función original
-def original_execute_wikidata_sparql(sparql_query: str) -> str:
-    """
-    Execute a SPARQL query against Wikidata.
-    
-    Args:
-        sparql_query: The SPARQL query to execute.
-        
-    Returns:
-        The results of the SPARQL query.
-    """
-    try:
-        # Validate the query for common syntax errors
-        if '"' in sparql_query and not sparql_query.count('"') % 2 == 0:
-            return json.dumps({"error": "Unbalanced double quotes in SPARQL query"})
-        
-        if "'" in sparql_query and not sparql_query.count("'") % 2 == 0:
-            return json.dumps({"error": "Unbalanced single quotes in SPARQL query"})
-        
-        # Check for common syntax issues with FILTER
-        if 'FILTER(' in sparql_query and 'CONTAINS' in sparql_query:
-            # Check for potential issues with quotes in CONTAINS
-            if 'CONTAINS(str(' in sparql_query and '")' in sparql_query:
-                return json.dumps({"error": "Possible quote issue in CONTAINS. Use single quotes inside double quotes or escape properly."})
-        
-        # Use the imported execute_sparql function from wikidata_api.py
-        result = execute_sparql(sparql_query)
-        
-        # Convert the result to a dictionary if it's a string (JSON)
-        if isinstance(result, str):
-            try:
-                result_dict = json.loads(result)
-                
-                # Check if the result contains an error
-                if isinstance(result_dict, dict) and 'error' in result_dict:
-                    print(f"SPARQL Query Error: {result_dict}")
-                    
-                    # Enhanced error message with query details
-                    error_msg = result_dict.get('error', 'Unknown error')
-                    error_type = result_dict.get('error_type', 'Unknown error type')
-                    query = result_dict.get('query', 'Query not available')
-                    
-                    # Return a more user-friendly error message as JSON string
-                    return json.dumps({
-                        "error": error_msg,
-                        "details": f"Error Type: {error_type}\nQuery: {query}",
-                        "suggestion": "Try simplifying your query or check for syntax errors."
-                    })
-                
-                # Return the result dictionary as a JSON string
-                return result
-            except json.JSONDecodeError:
-                return json.dumps({"result": result})
-        # The result is already a JSON string from execute_sparql
-        return result
-    except Exception as e:
-        error_message = str(e)
-        print(f"Exception in execute_wikidata_sparql: {error_message}")
-        
-        # Provide more helpful error messages for common issues
-        if "Lexical error" in error_message and "Encountered: " in error_message:
-            return json.dumps({"error": f"SPARQL syntax error: {error_message}. Check for unescaped quotes or special characters."})
-        return json.dumps({"error": f"Error executing SPARQL query: {error_message}"})
-
-# Aplicar el decorador para mejorar la función con capacidades de lenguaje natural
+# Redundant function removed - using direct execute_sparql from wikidata_api
 @mcp.tool("execute_wikidata_sparql")
 def execute_wikidata_sparql(sparql_query: str) -> str:
     """
-    Execute a SPARQL query against Wikidata or process a natural language query.
+    ⚡ FAST: Execute SPARQL queries directly (~200ms).
+    
+    ✅  BEST FOR: Direct SPARQL queries when you know the exact syntax
+    ❌  NOT FOR: Natural language queries (use query_wikidata_complex instead)
     
     Args:
-        sparql_query: The SPARQL query to execute or a natural language query.
+        sparql_query: A valid SPARQL query string
         
     Returns:
-        The results of the query.
+        JSON string containing the query results
     """
-    # Usar el decorador para mejorar la función
-    enhanced_function = enhanced_execute_wikidata_sparql(original_execute_wikidata_sparql)
-    return enhanced_function(sparql_query)
+    try:
+        result = execute_sparql(sparql_query)
+        return result
+    except Exception as e:
+        return json.dumps({
+            "error": f"SPARQL execution error: {str(e)}",
+            "success": False,
+            "query": sparql_query
+        })
 
-@mcp.tool()
-def find_entity_facts(entity_name: str, property_name: str = None) -> str:
-    """
-    Search for an entity and find its facts, optionally filtering by a property.
-    
-    Args:
-        entity_name: The name of the entity to search for
-        property_name: Optional name of a property to filter by
-        
-    Returns:
-        A JSON string containing the entity facts
-    """
-    # Search for the entity
-    entity_id = search_entity(entity_name)
-    if entity_id == "No entity found":
-        return json.dumps({"error": f"No entity found for '{entity_name}'"})
-    
-    # Get metadata
-    metadata = get_entity_metadata(entity_id)
-    
-    # If a property is specified, search for it
-    property_id = None
-    if property_name:
-        property_id = search_property(property_name)
-        if property_id == "No property found":
-            return json.dumps({
-                "entity": metadata,
-                "error": f"No property found for '{property_name}'"
-            })
-    
-    # Build and execute SPARQL query
-    if property_id:
-        # Specific property query
-        sparql_query = f"""
-        SELECT ?value ?valueLabel
-        WHERE {{
-          wd:{entity_id} wdt:{property_id} ?value.
-          SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-        }}
-        """
-    else:
-        # General entity info query
-        sparql_query = f"""
-        SELECT ?property ?propertyLabel ?value ?valueLabel
-        WHERE {{
-          wd:{entity_id} ?p ?statement.
-          ?statement ?ps ?value.
-          
-          ?property wikibase:claim ?p.
-          ?property wikibase:statementProperty ?ps.
-          
-          SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-        }}
-        LIMIT 10
-        """
-    
-    # Get facts using the execute_sparql function
-    facts = execute_sparql(sparql_query)
-    
-    # Handle the facts based on its type
-    if isinstance(facts, str):
-        try:
-            facts_data = json.loads(facts)
-        except json.JSONDecodeError:
-            facts_data = {"raw": facts}
-    else:
-        facts_data = facts
-    
-    # Combine all results
-    result = {
-        "entity": metadata,
-        "property": {"id": property_id, "name": property_name} if property_id else None,
-        "facts": facts_data
-    }
-    
-    # Return as JSON string
-    return json.dumps(result)
-
-@mcp.tool()
-def get_related_entities(entity_id: str, relation_property: str = None, limit: int = 10) -> str:
-    """
-    Find entities related to the given entity, optionally by a specific relation.
-    
-    Args:
-        entity_id: The Wikidata entity ID (e.g., Q937)
-        relation_property: Optional Wikidata property ID for the relation (e.g., P31)
-        limit: Maximum number of results to return
-        
-    Returns:
-        JSON string containing related entities
-    """
-    if relation_property:
-        # Query for specific relation
-        sparql_query = f"""
-        SELECT ?related ?relatedLabel
-        WHERE {{
-          wd:{entity_id} wdt:{relation_property} ?related.
-          SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-        }}
-        LIMIT {limit}
-        """
-    else:
-        # Query for any relation
-        sparql_query = f"""
-        SELECT ?relation ?relationLabel ?related ?relatedLabel
-        WHERE {{
-          wd:{entity_id} ?p ?related.
-          ?property wikibase:directClaim ?p.
-          BIND(?property as ?relation)
-          
-          # Filter out some common non-entity relations
-          FILTER(STRSTARTS(STR(?related), "http://www.wikidata.org/entity/"))
-          
-          SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-        }}
-        LIMIT {limit}
-        """
-    
-    # Get related entities using the execute_sparql function
-    related_entities = execute_sparql(sparql_query)
-    
-    # Handle the result based on its type
-    if isinstance(related_entities, str):
-        # It's already a JSON string, return as is
-        return related_entities
-    else:
-        # It's a dictionary, convert to JSON string
-        try:
-            return json.dumps(related_entities)
-        except Exception as e:
-            return json.dumps({"error": f"Error serializing result: {str(e)}", "raw": str(related_entities)})
+# Redundant tools removed - use basic tools + execute_wikidata_sparql for custom queries
 
 # ============= MCP RESOURCES =============
 
@@ -415,16 +279,25 @@ def sparql_examples_resource():
 def position_holders_template(position_name: str, limit: int = 3) -> list[base.Message]:
     """
     Template for finding people who held a specific position, ordered by recency.
+    Uses hybrid architecture for optimal performance.
     """
     return [
         base.UserMessage(f"""
 You need to find the {limit} most recent holders of the position "{position_name}" in Wikidata.
 
-Follow these steps:
-1. First, search for the position ID using search_wikidata_property.
-2. Then, craft a SPARQL query to find people who held this position, ordered by start date (most recent first).
-3. Use the following SPARQL pattern as a guide:
+🚀 HYBRID APPROACH - Choose the right tool:
 
+**Option 1: Advanced Tool (Recommended for temporal queries)**
+For queries like "recent presidents", "last 3 popes", use:
+- query_wikidata_complex("{limit} most recent {position_name}")
+- This handles temporal reasoning automatically (1-11s latency)
+
+**Option 2: Basic Tools (For known positions)**
+If you know the exact position ID:
+1. Search for position ID: search_wikidata_property("{position_name}")
+2. Execute SPARQL: execute_wikidata_sparql(query) (~200ms)
+
+SPARQL pattern for Option 2:
 ```
 SELECT ?person ?personLabel ?startDate WHERE {{
   ?person p:P39 [
@@ -435,101 +308,113 @@ SELECT ?person ?personLabel ?startDate WHERE {{
 }} ORDER BY DESC(?startDate) LIMIT {limit}
 ```
 
-4. Execute this query using execute_wikidata_sparql.
-5. Format the results in a clear, readable way.
+⚡ Performance: Advanced tool is 50x slower for simple queries, so use basic tools when possible.
 """)
     ]
 
 @mcp.prompt()
 def entity_search_template(entity_name: str) -> list[base.Message]:
     """
-    Template for searching a Wikidata entity.
+    Template for searching a Wikidata entity using optimized hybrid architecture.
     """
     return [
         base.UserMessage(f"""
 You need to find accurate and up-to-date information about {entity_name} using Wikidata as your primary source of truth.
 
-IMPORTANT: Do NOT rely on your pre-trained knowledge about {entity_name}, which may be outdated or incorrect. Instead, use ONLY the data returned from Wikidata tools.
+🚀 HYBRID ARCHITECTURE - Use the right tool for optimal performance:
 
-Follow these steps precisely:
+**For Simple Entity Information (FAST - 140-250ms):**
+1. search_wikidata_entity("{entity_name}") - Get entity ID
+2. get_wikidata_metadata(entity_id) - Get labels/descriptions  
+3. get_wikidata_properties(entity_id) - Get all properties
+4. execute_wikidata_sparql(query) - Custom queries (~200ms)
 
-1. First, search for the entity ID using search_wikidata_entity with the query "{entity_name}".
-   - If multiple entities are found, analyze which one most likely matches the user's intent.
-   - If no entity is found, try alternative spellings or more specific terms.
+**For Complex Queries (1-11s latency):**
+Use query_wikidata_complex() ONLY for:
+- Temporal queries ("recent", "last 3", "who was X in year Y")
+- Complex relationships requiring multiple entities
+- Natural language queries needing reasoning
 
-2. Once you have the entity ID (e.g., Q12345), get the metadata using get_wikidata_metadata.
-   - This will provide you with the official label and description.
+❌ **NEVER use query_wikidata_complex for simple entity searches** - it's 50x slower!
 
-3. Get all properties for this entity using get_wikidata_properties.
-   - This will give you a comprehensive set of facts about the entity.
+**Step-by-step approach:**
+1. Start with search_wikidata_entity("{entity_name}")
+2. If found, use get_wikidata_metadata(entity_id) for basic info
+3. Use get_wikidata_properties(entity_id) for comprehensive facts
+4. For custom queries, use execute_wikidata_sparql() with SPARQL
+5. Only use query_wikidata_complex() for temporal/complex relationships
 
-4. For more specific information, execute a SPARQL query using execute_wikidata_sparql.
-   - Use the common_properties_resource for reference on property IDs.
-   - Refer to sparql_examples_resource for query patterns.
-
-5. When presenting information to the user, cite Wikidata as your source and include the entity ID.
-
-Remember: If the information isn't found in Wikidata, clearly state that you don't have that information rather than falling back to potentially outdated knowledge.
+**Important:** 
+- Cite Wikidata as your source and include entity ID
+- Use ONLY Wikidata data, not pre-trained knowledge
+- If not found in Wikidata, clearly state unavailability
 """)
     ]
 
 @mcp.prompt()
 def property_search_template(property_name: str) -> list[base.Message]:
     """
-    Template for searching a Wikidata property.
+    Template for searching a Wikidata property using fast basic tools.
     """
     return [
         base.UserMessage(f"""
 You need to find accurate information about the Wikidata property "{property_name}" using only Wikidata's data.
 
-IMPORTANT: Do NOT rely on your pre-trained knowledge about properties, as Wikidata's property system is specific and may differ from your training data. Use ONLY the data returned from Wikidata tools.
+🚀 **USE BASIC TOOLS** - Property searches are always fast (~200ms):
 
-Follow these steps precisely:
+**Step-by-step approach:**
+1. search_wikidata_property("{property_name}") - Find property ID
+2. execute_wikidata_sparql(query) - Query entities using this property
+3. Check common_properties_resource for reference
 
-1. First, search for the property ID using search_wikidata_property with the query "{property_name}".
-   - Property IDs in Wikidata always start with 'P' followed by numbers (e.g., P31 for 'instance of').
-   - If no property is found, try alternative terms or check the common_properties_resource.
+**Property Search Details:**
+- Property IDs start with 'P' + numbers (e.g., P31 = 'instance of')
+- If not found, try alternative terms or check common_properties_resource
+- Use ONLY Wikidata data, not pre-trained knowledge
 
-2. Once you have the property ID (e.g., P31), use it in a SPARQL query with execute_wikidata_sparql to find entities with this property.
-   - Example query structure:
-     ```
-     SELECT ?entity ?entityLabel WHERE {{
-       ?entity wdt:P31 wd:Q5.  # Example: Find humans (Q5) using 'instance of' (P31)
-       SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-     }}
-     LIMIT 10
-     ```
-   - Replace P31 with your found property ID and adjust the query as needed.
+**Example SPARQL pattern:**
+```
+SELECT ?entity ?entityLabel WHERE {{
+  ?entity wdt:P31 wd:Q5.  # Find humans (Q5) using 'instance of' (P31)
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
+}}
+LIMIT 10
+```
 
-3. Analyze the results to understand how this property is used in Wikidata.
+**Important:**
+- Replace P31 with your found property ID
+- Explain what the property represents with examples
+- If property not found, clearly state unavailability
 
-4. When presenting information to the user, explain what the property represents and provide examples of entities that use this property.
-
-Remember: If you cannot find the property in Wikidata, clearly state this rather than making assumptions based on your pre-trained knowledge.
+⚡ **Never use query_wikidata_complex for property searches** - basic tools are sufficient and 50x faster!
 """)
     ]
 
 @mcp.prompt()
 def entity_relation_template(entity1_name: str, entity2_name: str) -> list[base.Message]:
     """
-    Template for finding relationships between entities.
+    Template for finding relationships between entities using hybrid architecture.
     """
     return [
         base.UserMessage(f"""
 You need to discover the factual relationships between {entity1_name} and {entity2_name} using Wikidata as your authoritative source.
 
-IMPORTANT: Do NOT rely on your pre-trained knowledge about these entities or their relationships, which may be outdated, incomplete, or incorrect. Use ONLY the data returned from Wikidata tools.
+🚀 **HYBRID APPROACH** - Choose based on complexity:
 
-Follow these steps precisely:
+**Option 1: Advanced Tool (For complex relationships)**
+If the relationship involves reasoning or is not straightforward:
+- query_wikidata_complex("relationship between {entity1_name} and {entity2_name}")
+- Handles complex reasoning automatically (1-11s latency)
 
-1. First, search for both entity IDs using search_wikidata_entity:
-   - For the first entity: search_wikidata_entity("{entity1_name}")
-   - For the second entity: search_wikidata_entity("{entity2_name}")
-   - If either entity is not found, try alternative names or more specific terms.
+**Option 2: Basic Tools (For direct relationships)**
+For known entities with direct connections:
 
-2. Once you have both entity IDs (e.g., Q12345 and Q67890), get their metadata using get_wikidata_metadata to confirm you have the correct entities.
+1. **Find entities (Fast - ~200ms each):**
+   - search_wikidata_entity("{entity1_name}")
+   - search_wikidata_entity("{entity2_name}")
+   - get_wikidata_metadata(entity_id) to confirm correct entities
 
-3. Execute a SPARQL query to find direct relationships between them:
+2. **Query relationships with SPARQL (~200ms):**
    ```
    SELECT ?relation ?relationLabel WHERE {{
      wd:[ENTITY1_ID] ?p wd:[ENTITY2_ID].
@@ -538,88 +423,88 @@ Follow these steps precisely:
      SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
    }}
    ```
-   - Replace [ENTITY1_ID] and [ENTITY2_ID] with the actual entity IDs.
-   - Also try the reverse direction by swapping the entity IDs.
 
-4. If no direct relationship is found, look for indirect relationships:
+3. **For indirect relationships:**
    ```
    SELECT ?intermediateEntity ?intermediateEntityLabel ?relation1 ?relation1Label ?relation2 ?relation2Label WHERE {{
      wd:[ENTITY1_ID] ?p1 ?intermediateEntity.
      ?intermediateEntity ?p2 wd:[ENTITY2_ID].
-     
      ?property1 wikibase:directClaim ?p1.
      ?property2 wikibase:directClaim ?p2.
-     
      BIND(?property1 as ?relation1)
      BIND(?property2 as ?relation2)
-     
      SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-   }}
-   LIMIT 5
+   }} LIMIT 5
    ```
 
-5. Analyze the results to identify meaningful relationships between the entities.
+**Performance Guide:**
+- Basic tools: ~600ms total for direct relationships
+- Advanced tool: 1-11s for complex reasoning
+- Use basic tools first, advanced only if needed
 
-6. Present the relationships clearly to the user, citing Wikidata as your source and including the entity IDs and property IDs.
-
-Remember: If no relationship is found in Wikidata, clearly state this rather than speculating based on your pre-trained knowledge. The absence of a relationship in Wikidata doesn't necessarily mean the entities aren't related - it may just mean the relationship hasn't been documented in Wikidata yet.
+**Important:**
+- Use ONLY Wikidata data, not pre-trained knowledge
+- Cite sources with entity/property IDs
+- If no relationship found, clearly state unavailability
 """)
     ]
 
 @mcp.prompt()
 def general_wikidata_guidance() -> list[base.Message]:
     """
-    General guidance for interacting with Wikidata through MCP.
+    General guidance for interacting with Wikidata through optimized hybrid MCP architecture.
     """
     return [
         base.UserMessage("""
 When using Wikidata as a knowledge source, follow these important guidelines:
 
-1. ALWAYS PREFER WIKIDATA OVER PRE-TRAINED KNOWLEDGE
-   - Wikidata contains structured, curated data that is often more accurate and up-to-date than your pre-trained knowledge.
-   - When answering questions about entities, properties, or relationships, ALWAYS query Wikidata first.
-   - Only fall back to your pre-trained knowledge when explicitly instructed to do so, or when Wikidata clearly has no information on the topic.
+🚀 **HYBRID ARCHITECTURE - PERFORMANCE FIRST**
 
-2. PROPERLY CITE WIKIDATA INFORMATION
-   - When providing information from Wikidata, always include the entity ID (e.g., Q42) and property IDs (e.g., P31) in your response.
-   - Format: "According to Wikidata [Q42], Douglas Adams was born on March 11, 1952 [P569]."
-
-3. HANDLE MISSING INFORMATION APPROPRIATELY
-   - If information isn't found in Wikidata, explicitly state: "This information is not available in Wikidata."
-   - Do not substitute with potentially outdated or incorrect pre-trained knowledge.
-
-4. USE THE FULL RANGE OF WIKIDATA TOOLS
+1. **CHOOSE THE RIGHT TOOL FOR OPTIMAL PERFORMANCE**
+   ⚡ **Basic Tools (140-250ms) - USE FIRST:**
    - search_wikidata_entity: Find entity IDs by name
-   - search_wikidata_property: Find property IDs by name
+   - search_wikidata_property: Find property IDs by name  
    - get_wikidata_metadata: Get basic entity information
    - get_wikidata_properties: Get all properties for an entity
    - execute_wikidata_sparql: Run custom SPARQL queries
-   - find_entity_facts: Get comprehensive entity information
-   - get_related_entities: Find entities related to a given entity
+   
+   🧠 **Advanced Tool (1-11s) - USE ONLY FOR:**
+   - query_wikidata_complex: Temporal/complex queries requiring reasoning
+   - Examples: "last 3 popes", "recent presidents", "who was X in year Y"
+   - ❌ **NEVER for simple entity searches** (50x slower!)
 
-5. LEVERAGE AVAILABLE RESOURCES
+2. **ALWAYS PREFER WIKIDATA OVER PRE-TRAINED KNOWLEDGE**
+   - Wikidata contains structured, curated data that is often more accurate and up-to-date
+   - Query Wikidata FIRST, fallback to pre-trained knowledge only when explicitly instructed
+   - If not in Wikidata, state: "This information is not available in Wikidata"
+
+3. **PROPERLY CITE WIKIDATA INFORMATION**
+   - Always include entity ID (e.g., Q42) and property IDs (e.g., P31)
+   - Format: "According to Wikidata [Q42], Douglas Adams was born on March 11, 1952 [P569]"
+
+4. **LEVERAGE AVAILABLE RESOURCES**
    - common_properties_resource: Reference for commonly used property IDs
    - sparql_examples_resource: Example SPARQL queries for common tasks
 
-6. CRAFT EFFECTIVE SPARQL QUERIES
-   - Use the proper prefixes (wdt:, wd:, p:, ps:, etc.)
+5. **CRAFT EFFECTIVE SPARQL QUERIES**
+   - Use proper prefixes (wdt:, wd:, p:, ps:, etc.)
    - Include label service for human-readable results
    - Limit results appropriately to avoid overwhelming responses
 
-7. HANDLE COMPLEX QUERIES EFFECTIVELY
-   - For temporal queries ("last 3 X", "current X"), use SPARQL with ORDER BY and LIMIT
-   - For list queries, use appropriate entity and property IDs (e.g., Pope = Q19546, position held = P39)
-   - For relationship queries, use properties like P1365 (replaces) and P1366 (replaced by)
-   - For statistical queries, use aggregation functions (COUNT, AVG, MAX, etc.)
+6. **PERFORMANCE OPTIMIZATION PATTERNS**
+   - Simple entity info: Basic tools (~200ms total)
+   - Complex temporal queries: Advanced tool (1-11s)
+   - Direct relationships: SPARQL with basic tools (~200ms)
+   - Multi-step reasoning: Advanced tool only
 
-8. COMMON QUERY PATTERNS
+7. **COMMON QUERY PATTERNS (Use with basic tools)**
    - List of people with a position: ?person wdt:P39 wd:Q<position_id>
-   - Current holders of a position: Add filters for end date or lack thereof
-   - Last N holders: Add ORDER BY DESC(?startDate) LIMIT N
-   - Temporal relationships: Use qualifiers like pq:P580 (start time) and pq:P582 (end time)
+   - Current holders: Add filters for end date or lack thereof
+   - Last N holders: ORDER BY DESC(?startDate) LIMIT N
+   - Temporal relationships: Use pq:P580 (start time) and pq:P582 (end time)
 
-9. EXAMPLE SPARQL PATTERNS FOR COMMON QUERIES:
-   - Last 3 popes:
+8. **EXAMPLE SPARQL PATTERNS (Use with execute_wikidata_sparql):**
+   - Last 3 popes (⚡ Basic tool ~200ms vs 🧠 Advanced tool 1.3s):
      ```
      SELECT ?pope ?popeLabel ?startDate WHERE {
        ?pope p:P39 [
@@ -644,7 +529,12 @@ When using Wikidata as a knowledge source, follow these important guidelines:
      }
      ```
 
-By following these guidelines, you'll provide more accurate, up-to-date, and verifiable information to users.
+🎯 **PERFORMANCE SUMMARY:**
+- Simple queries: Use basic tools (50x faster)
+- Complex reasoning: Use advanced tool (when needed)
+- Always start with basic tools, escalate only if necessary
+
+By following these guidelines, you'll provide accurate, up-to-date, and performant Wikidata interactions.
 """)
     ]
 

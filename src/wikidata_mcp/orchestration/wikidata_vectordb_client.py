@@ -6,7 +6,7 @@ class WikidataVectorDBClient:
         self.api_key = api_key
         self.base_url = base_url
         self.headers = {
-            'Authorization': f'Bearer {api_key}',
+            'x-api-secret': api_key,
             'Content-Type': 'application/json'
         }
     
@@ -21,14 +21,15 @@ class WikidataVectorDBClient:
         Returns:
             List of dictionaries containing entity information
         """
-        url = f"{self.base_url}/search"
-        response = requests.post(
+        url = f"{self.base_url}/item/query/"
+        params = {
+            "query": query,
+            "K": limit
+        }
+        response = requests.get(
             url,
             headers=self.headers,
-            json={
-                "query": query,
-                "limit": limit
-            }
+            params=params
         )
         response.raise_for_status()
         return response.json()

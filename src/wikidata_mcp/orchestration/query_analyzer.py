@@ -46,7 +46,7 @@ class QueryAnalyzer:
         # Detect entities from vector search results
         if vector_entities:
             for entity in vector_entities:
-                entity_id = entity.get('id') or entity.get('entity_id')
+                entity_id = entity.get('QID') or entity.get('id') or entity.get('entity_id')
                 if entity_id and entity_id not in entities:
                     entities.append(entity_id)
 
