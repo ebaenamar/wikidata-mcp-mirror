@@ -6,7 +6,7 @@ from .query_analyzer import QueryAnalyzer
 from .temporal_specialist import TemporalSpecialist
 from .query_signals import QuerySignal
 from .wikidata_cache import WikidataCache
-from wikidata_mcp.orchestration.query_feedback import QueryFeedback
+from .query_feedback import QueryFeedback
 from .wikidata_vectordb_client import WikidataVectorDBClient
 
 class QueryOrchestrator:

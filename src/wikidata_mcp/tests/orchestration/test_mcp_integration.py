@@ -2,10 +2,10 @@ import unittest
 import json
 import datetime
 from unittest.mock import patch
-from orchestration.mcp_integration import process_natural_language_query
+from wikidata_mcp.orchestration.mcp_integration import process_natural_language_query
 
 class TestMCPIntegration(unittest.TestCase):
-    @patch('orchestration.query_orchestrator.QueryOrchestrator.process_query')
+    @patch('wikidata_mcp.orchestration.query_orchestrator.QueryOrchestrator.process_query')
     def test_process_natural_language_query(self, mock_process_query):
         # Configure the mock to return a simulated result
         mock_result = {
@@ -31,7 +31,7 @@ class TestMCPIntegration(unittest.TestCase):
         # Verify that the result is as expected
         self.assertEqual(result, mock_result)
         
-    @patch('orchestration.query_orchestrator.QueryOrchestrator.process_query')
+    @patch('wikidata_mcp.orchestration.query_orchestrator.QueryOrchestrator.process_query')
     def test_process_query_with_custom_date(self, mock_process_query):
         # Configure the mock to return a simulated result with metadata
         test_date = datetime.date(2023, 1, 1)
@@ -60,7 +60,7 @@ class TestMCPIntegration(unittest.TestCase):
         self.assertIn("metadata", result)
         self.assertEqual(result["metadata"]["current_date"], test_date.isoformat())
     
-    @patch('orchestration.query_orchestrator.QueryOrchestrator.process_query')
+    @patch('wikidata_mcp.orchestration.query_orchestrator.QueryOrchestrator.process_query')
     def test_process_query_with_error(self, mock_process_query):
         # Configure the mock to throw an exception
         mock_process_query.side_effect = Exception("Test error")
@@ -77,7 +77,7 @@ class TestMCPIntegration(unittest.TestCase):
         self.assertIn("current_date", result["metadata"])
         self.assertIn("query_processed_on", result["metadata"])
         
-    @patch('orchestration.query_orchestrator.QueryOrchestrator.process_query')
+    @patch('wikidata_mcp.orchestration.query_orchestrator.QueryOrchestrator.process_query')
     def test_process_query_with_error_and_custom_date(self, mock_process_query):
         # Configure the mock to throw an exception
         mock_process_query.side_effect = Exception("Test error")

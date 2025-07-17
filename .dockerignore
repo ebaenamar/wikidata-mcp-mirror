@@ -1,54 +1,107 @@
-# Git
-.git
-.gitignore
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
+*.pyd
 *.so
-.pytest_cache/
-.mypy_cache/
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Virtual Environment
+# Virtual environment
+.venv
+env/
 venv/
 ENV/
 
-# Environment variables
-.env
-.env.*
-!.env.example
-
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
+*~
 
-# Build and distribution
-build/
-dist/
-*.egg-info/
+# Environment files
+.env
+!.env.example
 
 # Logs
 logs/
 *.log
 
 # Local development
-Dockerfile*
-docker-compose*
+local_settings.py
+local_config.py
 
-# Testing
-.coverage
+# Test and coverage
 htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
 
-# Documentation
-site/
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# OS
+# macOS
 .DS_Store
-Thumbs.db
+.AppleDouble
+.LSOverride
 
 # Project specific
 *.db
 *.sqlite3
+
+# Cache
+.cache/
+.mypy_cache/
+.pytest_cache/
+
+# Documentation
+docs/_build/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Local development
+*.local
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Project specific exclusions
+!src/wikidata_mcp/*.py
+!src/wikidata_mcp/*.pyi
+!src/wikidata_mcp/*.so
+!src/wikidata_mcp/*.dll
+
+# Keep the source directory structure
+!src/wikidata_mcp/**/

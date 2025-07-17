@@ -1,0 +1,11 @@
+include README.md
+include requirements.txt
+include requirements-dev.txt
+include .env.example
+include docker-compose.yml
+include docker-compose.prod.yml
+include Dockerfile
+include Makefile
+
+recursive-include wikidata_mcp *.py
+recursive-include tests *.py

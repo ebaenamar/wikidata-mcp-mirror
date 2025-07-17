@@ -13,9 +13,9 @@ sse-starlette>=1.6.5
 anyio>=4.8.0
 
 # Vector DB Client
-# Reemplaza con el cliente específico de tu proveedor de Vector DB
-# Ejemplo: pinecone-client, chromadb, etc.
-# pinecone-client>=2.2.0
+chromadb>=0.4.15
+numpy>=1.24.0
+sentence-transformers>=2.2.2
 
 # Caching and Performance
 redis>=4.6.0
