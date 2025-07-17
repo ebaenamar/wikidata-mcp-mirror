@@ -1,11 +1,14 @@
-# Wikidata MCP Server (SSE Version)
+# Wikidata MCP Server with Vector DB Integration
 
-A Model Context Protocol (MCP) server with Server-Sent Events (SSE) transport that connects Large Language Models to Wikidata's structured knowledge base. This server enables LLMs to search for entities, retrieve metadata, query relationships, and execute SPARQL queries to access factual information from Wikidata.
+A Model Context Protocol (MCP) server with Server-Sent Events (SSE) transport that connects Large Language Models to Wikidata's structured knowledge base, enhanced with Vector Database capabilities for improved semantic search. This server enables LLMs to search for entities, retrieve metadata, query relationships, and execute SPARQL queries to access factual information from Wikidata with enhanced accuracy through vector embeddings.
 
 ## Features
 
-- **SSE Transport**: Network-accessible MCP server (vs. stdio in the original version)
-- Search for Wikidata entities by name
+- **SSE Transport**: Network-accessible MCP server
+- **Vector DB Integration**: Enhanced semantic search using vector embeddings
+- **Intelligent Caching**: Configurable caching system for improved performance
+- **Query Feedback**: Learning system that improves over time based on user interactions
+- Search for Wikidata entities by name with semantic understanding
 - Search for Wikidata properties by name
 - Retrieve entity metadata (labels, descriptions)
 - Get entity properties and their values
@@ -50,12 +53,48 @@ To use this server with Claude Desktop:
 
 4. When using Claude, you can now access Wikidata knowledge through the configured MCP server.
 
-## Local Development
+## Deployment
+
+### Deploying to Render
+
+1. **Create a new Web Service** in your Render dashboard
+2. **Connect your GitHub repository**
+3. **Configure the service**:
+   - **Build Command**: `pip install -e .`
+   - **Start Command**: `python -m wikidata_mcp.api`
+4. **Set Environment Variables**:
+   - Add all variables from `.env.example`
+   - For production, set `DEBUG=false`
+   - Make sure to set a proper `WIKIDATA_VECTORDB_API_KEY`
+5. **Deploy**
+
+The service will be available at `https://your-service-name.onrender.com`
+
+## Environment Setup
 
 ### Prerequisites
 
 - Python 3.10+
 - Virtual environment tool (venv, conda, etc.)
+- Vector DB API key (for enhanced semantic search)
+
+### Environment Variables
+
+Create a `.env` file in the project root with the following variables:
+
+```bash
+# Required for Vector DB integration
+WIKIDATA_VECTORDB_API_KEY=your_vectordb_api_key_here
+
+# Optional configurations
+CACHE_TTL_SECONDS=3600  # Cache time-to-live in seconds
+CACHE_MAX_SIZE=1000     # Maximum number of items in cache
+USE_VECTOR_DB=true      # Enable/disable vector DB
+USE_CACHE=true          # Enable/disable caching
+USE_FEEDBACK=true       # Enable/disable feedback system
+```
+
+## Local Development
 
 ### Setup
 
@@ -74,18 +113,73 @@ To use this server with Claude Desktop:
 3. Install dependencies:
    ```bash
    pip install -r requirements.txt
+   pip install -e .  # Install in development mode
    ```
 
-4. Run the server locally:
+4. Set up environment variables:
    ```bash
-   python server_sse.py
+   cp .env.example .env  # Then edit .env with your actual values
    ```
 
-   The server will start on `http://localhost:8000` by default.
+5. Run the server locally:
+   ```bash
+   # Start the server with default settings
+   python -m wikidata_mcp.api
+   
+   # Or with custom settings
+   USE_VECTOR_DB=true CACHE_TTL_SECONDS=1800 python -m wikidata_mcp.api
+   ```
 
-## Testing the Server
+   The server will start on `http://localhost:8000` by default with the following endpoints:
+   - `GET /health` - Health check
+   - `GET /messages/` - SSE endpoint for MCP communication
+   - `GET /docs` - Interactive API documentation (if enabled)
+   - `GET /metrics` - Prometheus metrics (if enabled)
 
-You can test the server using the included test client:
+## Monitoring
+
+The service exposes Prometheus metrics at `/metrics` when the `PROMETHEUS_METRICS` environment variable is set to `true`.
+
+### Health Check
+
+```bash
+curl http://localhost:8000/health
+```
+
+### Metrics
+
+```bash
+curl http://localhost:8000/metrics
+```
+
+## Testing
+
+### Running Tests
+
+Run the test suite with:
+
+```bash
+# Run all tests
+pytest
+
+# Run specific test file
+pytest tests/orchestration/test_query_orchestrator.py -v
+
+# Run with coverage report
+pytest --cov=wikidata_mcp tests/
+```
+
+### Integration Tests
+
+To test the Vector DB integration, you'll need to set the `WIKIDATA_VECTORDB_API_KEY` environment variable:
+
+```bash
+WIKIDATA_VECTORDB_API_KEY=your_key_here pytest tests/orchestration/test_vectordb_integration.py -v
+```
+
+### Test Client
+
+You can also test the server using the included test client:
 
 ```bash
 python test_mcp_client.py

@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      target: builder  # Build only the builder stage for development
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - DEBUG=true
+      - USE_VECTOR_DB=${USE_VECTOR_DB:-false}
+      - USE_CACHE=${USE_CACHE:-true}
+      - USE_FEEDBACK=${USE_FEEDBACK:-true}
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    # Uncomment the following if you need Redis for caching
+    # depends_on:
+    #   - redis
+
+  # Uncomment and configure if you need Redis for caching
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 5
+
+# Uncomment if using Redis
+# volumes:
+#   redis_data:
