@@ -84,50 +84,37 @@ Create a `.env` file in the project root with the following variables:
 
 ```bash
 # Required for Vector DB integration
-WIKIDATA_VECTORDB_API_KEY=your_vectordb_api_key_here
-
-# Optional configurations
-CACHE_TTL_SECONDS=3600  # Cache time-to-live in seconds
-CACHE_MAX_SIZE=1000     # Maximum number of items in cache
-USE_VECTOR_DB=true      # Enable/disable vector DB
-USE_CACHE=true          # Enable/disable caching
-USE_FEEDBACK=true       # Enable/disable feedback system
-```
-
-## Local Development
-
-### Setup
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/ebaenamar/wikidata-mcp.git
-   cd wikidata-mcp-server-sse
+   git clone https://github.com/yourusername/wikidata-mcp-mirror.git
+   cd wikidata-mcp-mirror
    ```
 
 2. Create and activate a virtual environment:
    ```bash
    python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   source venv/bin/activate  # On Windows: .\venv\Scripts\activate
    ```
 
-3. Install dependencies:
+3. Install the required dependencies:
    ```bash
-   pip install -r requirements.txt
-   pip install -e .  # Install in development mode
+   pip install -e .
    ```
 
-4. Set up environment variables:
+4. Create a `.env` file based on `.env.example` and configure your environment variables:
    ```bash
-   cp .env.example .env  # Then edit .env with your actual values
+   cp .env.example .env
+   # Edit .env with your configuration
    ```
 
-5. Run the server locally:
+5. Run the application:
    ```bash
-   # Start the server with default settings
+   # Development
    python -m wikidata_mcp.api
    
-   # Or with custom settings
-   USE_VECTOR_DB=true CACHE_TTL_SECONDS=1800 python -m wikidata_mcp.api
+   # Production (with Gunicorn)
+   gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout 120 --keep-alive 5 --worker-class uvicorn.workers.UvicornWorker wikidata_mcp.api:app
    ```
 
    The server will start on `http://localhost:8000` by default with the following endpoints:
@@ -135,6 +122,47 @@ USE_FEEDBACK=true       # Enable/disable feedback system
    - `GET /messages/` - SSE endpoint for MCP communication
    - `GET /docs` - Interactive API documentation (if enabled)
    - `GET /metrics` - Prometheus metrics (if enabled)
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | 8000 | Port to run the server on |
+| `WORKERS` | 4 | Number of worker processes |
+| `TIMEOUT` | 120 | Worker timeout in seconds |
+| `KEEPALIVE` | 5 | Keep-alive timeout in seconds |
+| `DEBUG` | false | Enable debug mode |
+| `LOG_LEVEL` | INFO | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| `USE_VECTOR_DB` | true | Enable/disable vector DB integration |
+| `USE_CACHE` | true | Enable/disable caching system |
+| `USE_FEEDBACK` | true | Enable/disable feedback system |
+| `CACHE_TTL_SECONDS` | 3600 | Cache time-to-live in seconds |
+| `CACHE_MAX_SIZE` | 1000 | Maximum number of items in cache |
+| `WIKIDATA_VECTORDB_API_KEY` | | API key for the vector DB service |
+
+### Running with Docker
+
+1. Build the Docker image:
+   ```bash
+   docker build -t wikidata-mcp .
+   ```
+
+2. Run the container:
+   ```bash
+   docker run -p 8000:8000 --env-file .env wikidata-mcp
+   ```
+
+### Running with Docker Compose
+
+1. Start the application:
+   ```bash
+   docker-compose up --build
+   ```
+
+2. For production, use the production compose file:
+   ```bash
+   docker-compose -f docker-compose.prod.yml up --build -d
+   ```
 
 ## Monitoring
 

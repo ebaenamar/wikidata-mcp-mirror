@@ -56,6 +56,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 EXPOSE $PORT
 
 # Command to run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "$WORKERS", \
-     "--timeout", "$TIMEOUT", "--keep-alive", "$KEEPALIVE", \
-     "--worker-class", "uvicorn.workers.UvicornWorker", "wikidata_mcp.api:app"]
+CMD exec gunicorn --bind 0.0.0.0:${PORT:-8000} \
+    --workers ${WORKERS:-4} \
+    --timeout ${TIMEOUT:-120} \
+    --keep-alive ${KEEPALIVE:-5} \
+    --worker-class uvicorn.workers.UvicornWorker \
+    wikidata_mcp.api:app

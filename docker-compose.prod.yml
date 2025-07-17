@@ -4,17 +4,15 @@ services:
   app:
     build:
       context: .
-      target: builder  # Build only the builder stage for development
-    volumes:
-      - .:/app
+      target: builder
+    restart: always
     ports:
-      - "8000:8000"
+      - "${PORT:-8000}:${PORT:-8000}"
     environment:
       - PORT=${PORT:-8000}
       - WORKERS=${WORKERS:-4}
       - TIMEOUT=${TIMEOUT:-120}
       - KEEPALIVE=${KEEPALIVE:-5}
-      - DEBUG=${DEBUG:-false}
       - USE_VECTOR_DB=${USE_VECTOR_DB:-false}
       - USE_CACHE=${USE_CACHE:-true}
       - USE_FEEDBACK=${USE_FEEDBACK:-true}
@@ -23,20 +21,21 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
     env_file:
       - .env
-    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8000}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 5s
-    # Uncomment the following if you need Redis for caching
+    # Uncomment if using Redis
     # depends_on:
-    #   - redis
+    #   redis:
+    #     condition: service_healthy
 
   # Uncomment and configure if you need Redis for caching
   # redis:
   #   image: redis:7-alpine
+  #   restart: always
   #   ports:
   #     - "6379:6379"
   #   volumes:
