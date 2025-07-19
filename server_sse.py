@@ -541,7 +541,7 @@ By following these guidelines, you'll provide accurate, up-to-date, and performa
 # ============= CREATE SSE APP =============
 
 # Configure SSE transport with trailing slash to match client expectations
-sse_transport = SseServerTransport("/messages/")  
+sse_transport = SseServerTransport("/messages/")
 
 # Create FastAPI app with explicit CORS configuration
 app = FastAPI()
@@ -553,6 +553,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["Content-Type", "Cache-Control"],
 )
 
 # Almacenar sesiones activas
@@ -568,82 +569,45 @@ def root():
 def health():
     return {"status": "healthy", "connections": len(active_sessions)}
 
-# Define SSE endpoint
-@app.get("/sse")
-async def sse_endpoint(request: Request):
-    """SSE endpoint for MCP connections"""
-    client_host = request.client.host if hasattr(request, 'client') and request.client else 'unknown'
-    print(f"SSE connection request received from: {client_host}")
+# Define SSE endpoint for MCP protocol
+@app.get("/messages/")
+async def mcp_sse_endpoint(request: Request):
+    """SSE endpoint for MCP connections at /messages/"""
+    # Set the response headers for SSE
+    headers = {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+    }
     
-    # Check if there's a session ID in the query parameters
-    existing_session_id = request.query_params.get("session_id")
-    
-    # If a valid session ID was provided and exists, use it
-    if existing_session_id and existing_session_id in active_sessions:
-        session_id = existing_session_id
-        print(f"Using existing session ID: {session_id}")
-        # Update the last activity timestamp
-        active_sessions[session_id]["last_activity"] = datetime.now().isoformat()
-    else:
-        # Generate a new session ID for this connection
-        session_id = str(uuid4())
-        print(f"Generated new session ID: {session_id}")
-        
-        # Store the session with more metadata
-        active_sessions[session_id] = {
-            "client_host": client_host,
-            "created_at": datetime.now().isoformat(),
-            "last_activity": datetime.now().isoformat(),
-            "connection_count": 1
-        }
-    print(f"Active sessions: {len(active_sessions)}")
-    
-    # Use the standard SseServerTransport approach
-    async with sse_transport.connect_sse(
-        request.scope,
-        request.receive,
-        request._send,  # noqa: SLF001
-    ) as (read_stream, write_stream):
-        # Create timeout options with extended timeout
-        timeout_options = {"timeoutMs": 600000}  # 10 minutes
-        
-        print(f"Starting MCP server with session ID: {session_id}")
+    # Create a streaming response with the correct content type
+    async def event_stream():
         try:
-            # Add a small delay to ensure connection is fully established
-            await asyncio.sleep(0.5)
-            
-            # Use default initialization options without any modifications
-            init_options = mcp._mcp_server.create_initialization_options()
-            
-            # Run MCP server with default initialization options
-            await mcp._mcp_server.run(
-                read_stream,
-                write_stream,
-                init_options
-            )
-        except RuntimeError as re:
-            error_msg = str(re)
-            print(f"RuntimeError in MCP server: {error_msg}")
-            # Provide more detailed error message for initialization issues
-            if "initialization was complete" in error_msg:
-                print(f"Initialization error for session {session_id}. Client may have sent requests too early.")
-            # Eliminar la sesión si hay un error
-            if session_id in active_sessions:
-                del active_sessions[session_id]
-            # Don't re-raise the exception to prevent 500 errors
-            return Response(status_code=503, content="Service temporarily unavailable. Please try again.")
+            # Connect to the SSE transport
+            async with sse_transport.connect_sse(
+                request.scope,
+                request.receive,
+                request._send,
+            ) as (read_stream, write_stream):
+                # Initialize MCP server
+                init_options = mcp._mcp_server.create_initialization_options()
+                
+                # Run the MCP server
+                await mcp._mcp_server.run(
+                    read_stream,
+                    write_stream,
+                    init_options
+                )
         except Exception as e:
-            print(f"Error in MCP server: {e}")
-            # Eliminar la sesión si hay un error
-            if session_id in active_sessions:
-                del active_sessions[session_id]
-            # Don't re-raise the exception to prevent 500 errors
-            return Response(status_code=500, content="Internal server error. Please try again later.")
-        finally:
-            # Eliminar la sesión cuando se cierra la conexión
-            if session_id in active_sessions:
-                del active_sessions[session_id]
-            print(f"SSE connection closed for session {session_id}")
+            print(f"Error in MCP SSE endpoint: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    
+    # Return the streaming response with the correct headers
+    return StreamingResponse(
+        event_stream(),
+        headers=headers,
+        media_type="text/event-stream"
+    )
 
 # Añadir un endpoint OPTIONS explícito para /messages y /messages/
 @app.options("/messages")
@@ -747,6 +711,12 @@ async def post_messages_no_slash(request: Request):
 
 # Mount the messages endpoint with trailing slash for handling POST requests
 app.mount("/messages/", app=sse_transport.handle_post_message)
+
+# Add a simple GET handler for /messages (without trailing slash) that redirects to /messages/
+@app.get("/messages", include_in_schema=False)
+async def redirect_messages():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/messages/", status_code=301)
 
 # ============= SERVER EXECUTION =============
 
