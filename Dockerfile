@@ -68,9 +68,4 @@ EXPOSE $PORT
 
 # Set entrypoint and default command
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:${PORT:-8000}", \
-    "--workers", "${WORKERS:-4}", \
-    "--timeout", "${TIMEOUT:-120}", \
-    "--keep-alive", "${KEEPALIVE:-5}", \
-    "--worker-class", "uvicorn.workers.UvicornWorker", \
-    "wikidata_mcp.api:app"]
+CMD ["server"]

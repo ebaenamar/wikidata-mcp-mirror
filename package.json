@@ -1,0 +1,12 @@
+{
+  "name": "wikidata-mcp-gateway",
+  "version": "1.0.0",
+  "description": "MCP Gateway for Wikidata MCP Server",
+  "main": "mcp-gateway.js",
+  "scripts": {
+    "start": "node mcp-gateway.js"
+  },
+  "dependencies": {
+    "eventsource": "^2.0.2"
+  }
+}

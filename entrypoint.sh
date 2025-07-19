@@ -15,15 +15,10 @@ if [ "${1:0:1}" = '-' ]; then
     set -- gunicorn "$@"
 fi
 
-# Default to running gunicorn if no command is specified
-if [ "$1" = 'gunicorn' ]; then
-    exec gunicorn \
-        --bind "0.0.0.0:${PORT}" \
-        --workers "${WORKERS}" \
-        --timeout "${TIMEOUT}" \
-        --keep-alive "${KEEPALIVE}" \
-        --worker-class uvicorn.workers.UvicornWorker \
-        wikidata_mcp.api:app
+# Default to running the FastMCP server if no command is specified
+if [ "$1" = 'server' ] || [ "$1" = 'gunicorn' ]; then
+    echo "Starting Wikidata MCP Server with FastMCP SSE transport..."
+    exec python server_sse.py
 else
     # Execute any other command
     exec "$@"
