@@ -187,9 +187,12 @@ if __name__ == "__main__":
     print(f"Environment: PORT={port}, HOST={host}")
     
     # Start the server with explicit host and port binding
+    # Using FastMCP v2 configuration for SSE transport
     mcp.run(
         transport="sse",
-        host=host,
-        port=port,
+        transport_config={
+            "host": host,
+            "port": port
+        },
         log_level="info"
     )
