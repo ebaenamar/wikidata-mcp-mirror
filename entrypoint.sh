@@ -15,13 +15,14 @@ if [ "${1:0:1}" = '-' ]; then
     set -- gunicorn "$@"
 fi
 
-# Default to running the FastMCP server if no command is specified
+# Default to running the MCP server if no command is specified
 if [ "$1" = 'server' ] || [ "$1" = 'gunicorn' ]; then
-    echo "Starting Wikidata MCP Server with FastMCP SSE transport..."
-    echo "Environment: HOST=0.0.0.0, PORT=${PORT:-8000}"
+    echo "Starting Wikidata MCP Server with MCP SDK SSE transport..."
+    echo "Environment: PORT=${PORT:-8000}"
     
-    # Ensure server binds to all network interfaces for Render
-    export HOST="0.0.0.0"
+    # Set MCP SDK environment variables for Render deployment
+    export MCP_HOST="0.0.0.0"
+    export MCP_PORT="${PORT:-8000}"
     
     # Execute the server with the correct Python path
     cd /app

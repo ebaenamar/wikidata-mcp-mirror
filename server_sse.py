@@ -175,24 +175,20 @@ def common_properties_resource() -> str:
 # ============= SERVER EXECUTION =============
 
 if __name__ == "__main__":
-    print("Starting Wikidata MCP Server with FastMCP SSE transport...")
+    print("Starting Wikidata MCP Server with MCP SDK SSE transport...")
     
-    # Use FastMCP's built-in SSE transport
-    # Explicitly bind to all network interfaces for container deployment
+    # Set environment variables for MCP SDK configuration
     import os
-    host = '0.0.0.0'  # Always bind to all interfaces for Render
-    port = int(os.getenv('PORT', '8000'))  # Use PORT from environment or default to 8000
     
-    print(f"Starting server on {host}:{port}")
-    print(f"Environment: PORT={port}, HOST={host}")
+    # Ensure server binds to all interfaces for Render deployment
+    os.environ['MCP_HOST'] = '0.0.0.0'
     
-    # Start the server with explicit host and port binding
-    # Using FastMCP v2 configuration for SSE transport
-    mcp.run(
-        transport="sse",
-        transport_config={
-            "host": host,
-            "port": port
-        },
-        log_level="info"
-    )
+    # Use PORT from environment or default to 8000
+    port = os.getenv('PORT', '8000')
+    os.environ['MCP_PORT'] = str(port)
+    
+    print(f"Starting server on 0.0.0.0:{port}")
+    print(f"Environment: MCP_PORT={port}, MCP_HOST=0.0.0.0")
+    
+    # Start the server using MCP SDK (uses environment variables for configuration)
+    mcp.run()
