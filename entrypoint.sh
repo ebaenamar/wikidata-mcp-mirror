@@ -18,11 +18,11 @@ fi
 # Default to running the MCP server if no command is specified
 if [ "$1" = 'server' ] || [ "$1" = 'gunicorn' ]; then
     echo "Starting Wikidata MCP Server with FastMCP configuration..."
-    echo "Environment: PORT=${PORT:-8000}"
+    echo "Environment: PORT=${PORT:-10000}"
     
     # Set FastMCP environment variables for deployment
     export FASTMCP_HOST="0.0.0.0"
-    export FASTMCP_PORT="${PORT:-8000}"
+    export FASTMCP_PORT="${PORT:-10000}"
     
     # Execute the server with the correct Python path
     cd /app

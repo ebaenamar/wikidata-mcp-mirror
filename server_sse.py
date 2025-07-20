@@ -10,7 +10,7 @@ import os
 # Configure FastMCP environment variables BEFORE importing MCP modules
 # This ensures the configuration is applied when the modules are loaded
 host = '0.0.0.0'  # Always bind to all interfaces for production deployment
-port = int(os.getenv('PORT', '8000'))  # Use PORT from environment (Render, Heroku, etc.)
+port = int(os.getenv('PORT', '10000'))  # Use PORT from environment (Render default: 10000)
 
 # Set FastMCP environment variables for host and port binding
 os.environ['FASTMCP_HOST'] = host
