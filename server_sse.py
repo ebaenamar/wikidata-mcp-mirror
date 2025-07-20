@@ -178,5 +178,18 @@ if __name__ == "__main__":
     print("Starting Wikidata MCP Server with FastMCP SSE transport...")
     
     # Use FastMCP's built-in SSE transport
-    # FastMCP handles host/port via environment variables or defaults
-    mcp.run(transport="sse")
+    # Explicitly bind to all network interfaces for container deployment
+    import os
+    host = '0.0.0.0'  # Always bind to all interfaces for Render
+    port = int(os.getenv('PORT', '8000'))  # Use PORT from environment or default to 8000
+    
+    print(f"Starting server on {host}:{port}")
+    print(f"Environment: PORT={port}, HOST={host}")
+    
+    # Start the server with explicit host and port binding
+    mcp.run(
+        transport="sse",
+        host=host,
+        port=port,
+        log_level="info"
+    )

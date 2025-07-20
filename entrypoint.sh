@@ -18,6 +18,13 @@ fi
 # Default to running the FastMCP server if no command is specified
 if [ "$1" = 'server' ] || [ "$1" = 'gunicorn' ]; then
     echo "Starting Wikidata MCP Server with FastMCP SSE transport..."
+    echo "Environment: HOST=0.0.0.0, PORT=${PORT:-8000}"
+    
+    # Ensure server binds to all network interfaces for Render
+    export HOST="0.0.0.0"
+    
+    # Execute the server with the correct Python path
+    cd /app
     exec python server_sse.py
 else
     # Execute any other command
