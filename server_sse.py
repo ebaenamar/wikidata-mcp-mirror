@@ -6,6 +6,18 @@ built-in SSE transport that connects Large Language Models to Wikidata's
 structured knowledge base.
 """
 import os
+
+# Configure FastMCP environment variables BEFORE importing MCP modules
+# This ensures the configuration is applied when the modules are loaded
+host = '0.0.0.0'  # Always bind to all interfaces for production deployment
+port = int(os.getenv('PORT', '8000'))  # Use PORT from environment (Render, Heroku, etc.)
+
+# Set FastMCP environment variables for host and port binding
+os.environ['FASTMCP_HOST'] = host
+os.environ['FASTMCP_PORT'] = str(port)
+
+print(f"Pre-configuring FastMCP: HOST={host}, PORT={port}")
+
 from mcp.server.fastmcp import FastMCP
 from datetime import datetime
 
@@ -175,20 +187,9 @@ def common_properties_resource() -> str:
 # ============= SERVER EXECUTION =============
 
 if __name__ == "__main__":
-    print("Starting Wikidata MCP Server with MCP SDK SSE transport...")
+    print("Starting Wikidata MCP Server with FastMCP Streamable HTTP transport...")
+    print(f"Server will bind to {host}:{port} (configured at module load)")
     
-    # Set environment variables for MCP SDK configuration
-    import os
-    
-    # Ensure server binds to all interfaces for Render deployment
-    os.environ['MCP_HOST'] = '0.0.0.0'
-    
-    # Use PORT from environment or default to 8000
-    port = os.getenv('PORT', '8000')
-    os.environ['MCP_PORT'] = str(port)
-    
-    print(f"Starting server on 0.0.0.0:{port}")
-    print(f"Environment: MCP_PORT={port}, MCP_HOST=0.0.0.0")
-    
-    # Start the server using MCP SDK (uses environment variables for configuration)
-    mcp.run()
+    # Start the server using MCP SDK with streamable HTTP transport
+    # FastMCP configuration (host/port) was set at module import time
+    mcp.run(transport="streamable-http")
