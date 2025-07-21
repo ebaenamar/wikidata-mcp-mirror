@@ -1,14 +1,19 @@
 {
-  "name": "wikidata-mcp",
+  "name": "wikidata-mcp-mirror",
   "version": "1.0.0",
-  "description": "Wikidata MCP Client for Claude Desktop",
+  "description": "Wikidata MCP Client for Goose and Claude Desktop",
   "bin": {
     "wikidata-mcp": "./bin/wikidata-mcp.js"
   },
   "dependencies": {
     "mcp-remote": "^0.1.2"
   },
-  "keywords": ["mcp", "wikidata", "claude", "ai"],
-  "author": "MIT AI Ventures",
-  "license": "MIT"
+  "keywords": ["mcp", "wikidata", "goose", "claude", "ai"],
+  "author": "E. Baena",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ebaenamar/wikidata-mcp-mirror.git"
+  },
+  "homepage": "https://github.com/ebaenamar/wikidata-mcp-mirror#readme"
 }

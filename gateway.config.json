@@ -1,0 +1,5 @@
+{
+  "mcpServerUrl": "https://wikidata-mcp-mirror.onrender.com/messages/",
+  "port": 3000,
+  "logLevel": "debug"
+}

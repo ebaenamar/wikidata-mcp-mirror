@@ -1,10 +1,10 @@
-# Wikidata MCP para Claude Desktop
+# Wikidata MCP Mirror
 
-Este paquete proporciona acceso a Wikidata a través del Model Context Protocol (MCP) para Claude Desktop.
+Este paquete proporciona acceso a Wikidata a través del Model Context Protocol (MCP) para Goose y Claude Desktop.
 
 ## ¿Qué es esto?
 
-Este paquete permite a Claude Desktop conectarse a un servidor MCP de Wikidata, lo que le da a Claude la capacidad de:
+Este paquete permite a Goose y Claude Desktop conectarse a un servidor MCP de Wikidata, lo que les da la capacidad de:
 
 - Buscar entidades y propiedades en Wikidata
 - Obtener metadatos de entidades
@@ -13,9 +13,39 @@ Este paquete permite a Claude Desktop conectarse a un servidor MCP de Wikidata, 
 
 ## Opciones de instalación
 
-Hay dos formas de configurar Claude Desktop para usar nuestro servidor Wikidata MCP:
+Hay varias formas de configurar Goose o Claude Desktop para usar nuestro servidor Wikidata MCP:
 
-### Opción 1: Configuración directa (Recomendada)
+### Para Goose
+
+#### Opción 1: Conexión directa (Recomendada)
+
+Puedes conectarte directamente al servidor MCP usando el comando `--with-remote-extension`:
+
+```bash
+goose session --with-remote-extension https://wikidata-mcp-mirror.onrender.com/sse
+```
+
+O para ejecutar un comando específico:
+
+```bash
+goose run -t "wikidata, quiénes son los últimos 3 papas?" --with-remote-extension https://wikidata-mcp-mirror.onrender.com/sse
+```
+
+#### Opción 2: Usando nuestro paquete npm
+
+1. Instala nuestro paquete globalmente:
+   ```bash
+   npm install -g wikidata-mcp-mirror
+   ```
+
+2. Usa el comando `wikidata-mcp` como extensión:
+   ```bash
+   goose session --with-extension "wikidata-mcp"
+   ```
+
+### Para Claude Desktop
+
+#### Opción 1: Configuración directa
 
 Esta opción no requiere instalar nuestro paquete npm. Simplemente configura Claude Desktop para usar el paquete `mcp-remote` para conectarse directamente a nuestro servidor.
 
@@ -35,7 +65,7 @@ Esta opción no requiere instalar nuestro paquete npm. Simplemente configura Cla
     "args": [
       "mcp-remote",
       "--url",
-      "https://wikidata-mcp.onrender.com/sse"
+      "https://wikidata-mcp-mirror.onrender.com/sse"
     ]
   }
 }
@@ -43,13 +73,13 @@ Esta opción no requiere instalar nuestro paquete npm. Simplemente configura Cla
 
 4. Reinicia Claude Desktop.
 
-### Opción 2: Usando nuestro paquete npm
+#### Opción 2: Usando nuestro paquete npm
 
 Si prefieres usar nuestro paquete npm, sigue estos pasos:
 
 1. Instala nuestro paquete globalmente:
    ```bash
-   npm install -g wikidata-mcp
+   npm install -g wikidata-mcp-mirror
    ```
 
 2. Edita el archivo de configuración de Claude Desktop:
@@ -71,7 +101,18 @@ Si prefieres usar nuestro paquete npm, sigue estos pasos:
 
 ## Solución de problemas
 
-Si tienes problemas para conectarte al servidor Wikidata MCP, prueba lo siguiente:
+### Para Goose
+
+Si tienes problemas para conectarte al servidor Wikidata MCP con Goose, prueba lo siguiente:
+
+1. Asegúrate de estar usando la URL correcta con el endpoint `/sse`: `https://wikidata-mcp-mirror.onrender.com/sse`
+2. Verifica que Node.js esté instalado correctamente ejecutando `node --version` en tu terminal.
+3. Intenta ejecutar Goose con la bandera `--debug` para ver más información sobre la conexión.
+4. Asegúrate de que no haya otras instancias de Goose ejecutándose (usa `pkill -f goose` para terminar todos los procesos).
+
+### Para Claude Desktop
+
+Si tienes problemas para conectarte al servidor Wikidata MCP con Claude Desktop, prueba lo siguiente:
 
 1. Asegúrate de tener la última versión de Claude Desktop.
 2. Verifica que Node.js esté instalado correctamente ejecutando `node --version` en tu terminal.

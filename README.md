@@ -1,91 +1,225 @@
-# Wikidata MCP Server (SSE Version)
+# Wikidata MCP Server - Optimized Hybrid Architecture
 
-A Model Context Protocol (MCP) server with Server-Sent Events (SSE) transport that connects Large Language Models to Wikidata's structured knowledge base. This server enables LLMs to search for entities, retrieve metadata, query relationships, and execute SPARQL queries to access factual information from Wikidata.
+A Model Context Protocol (MCP) server with Server-Sent Events (SSE) transport that connects Large Language Models to Wikidata's structured knowledge base. Features an **optimized hybrid architecture** that balances speed, accuracy, and verifiability by using fast basic tools for simple queries and advanced orchestration only for complex temporal/relational queries.
 
-## Features
+## Architecture Highlights
 
-- **SSE Transport**: Network-accessible MCP server (vs. stdio in the original version)
-- Search for Wikidata entities by name
-- Search for Wikidata properties by name
-- Retrieve entity metadata (labels, descriptions)
-- Get entity properties and their values
-- Execute SPARQL queries against Wikidata's endpoint
-- Find entity facts with optional property filtering
-- Get related entities with optional relation filtering
-- Access common property references and SPARQL examples
-- Use prompt templates for common Wikidata interaction patterns
+- **🚀 Fast Basic Tools**: 140-250ms for simple entity/property searches
+- **🧠 Advanced Orchestration**: 1-11s for complex temporal queries (when needed)
+- **⚡ 50x Performance Difference**: Empirically measured and optimized
+- **🔄 Hybrid Approach**: Right tool for each query type
+- **🛡️ Graceful Degradation**: Works with or without Vector DB API key
+
+## MCP Tools
+
+### Basic Tools (Fast & Reliable)
+- **`search_wikidata_entity`**: Find entities by name (140-250ms)
+- **`search_wikidata_property`**: Find properties by name (~200ms)
+- **`get_wikidata_metadata`**: Entity labels, descriptions (~200ms)
+- **`get_wikidata_properties`**: All entity properties (~200ms)
+- **`execute_wikidata_sparql`**: Direct SPARQL queries (~200ms)
+
+### Advanced Tool (Complex Queries)
+- **`query_wikidata_complex`**: Temporal/relational queries (1-11s)
+  - ✅ "last 3 popes", "recent presidents of France"
+  - ❌ Simple entity searches (use basic tools instead)
 
 ## Live Demo
 
 The server is deployed and accessible at:
 
 - **URL**: [https://wikidata-mcp-mirror.onrender.com](https://wikidata-mcp-mirror.onrender.com)
-- **SSE Endpoint**: [https://wikidata-mcp-mirror.onrender.com/messages/](https://wikidata-mcp-mirror.onrender.com/messages/)
+- **MCP Endpoint**: [https://wikidata-mcp-mirror.onrender.com/mcp](https://wikidata-mcp-mirror.onrender.com/mcp)
 - **Health Check**: [https://wikidata-mcp-mirror.onrender.com/health](https://wikidata-mcp-mirror.onrender.com/health)
 
 ## Usage with Claude Desktop
 
 To use this server with Claude Desktop:
 
-1. Edit the Claude Desktop configuration file located at:
+1. **Install mcp-remote** (if not already installed):
+   ```bash
+   npm install -g @modelcontextprotocol/mcp-remote
+   ```
+
+2. Edit the Claude Desktop configuration file located at:
    ```
    ~/Library/Application Support/Claude/claude_desktop_config.json
    ```
 
-2. Configure it to use the remote MCP server:
+3. Configure it to use the remote MCP server:
    ```json
    {
      "mcpServers": {
-       "Wikidata Knowledge Remote": {
-         "command": "mcp-remote",
+       "Wikidata MCP": {
+         "command": "npx",
          "args": [
-           "https://wikidata-mcp-mirror.onrender.com/messages/"
+           "mcp-remote",
+           "https://wikidata-mcp-mirror.onrender.com/mcp"
          ]
        }
      }
    }
    ```
 
-3. Restart Claude Desktop
+4. Restart Claude Desktop
 
-4. When using Claude, you can now access Wikidata knowledge through the configured MCP server.
+5. When using Claude, you can now access Wikidata knowledge through the configured MCP server.
 
-## Local Development
+## Deployment
+
+### Deploying to Render
+
+1. **Create a new Web Service** in your Render dashboard
+2. **Connect your GitHub repository**
+3. **Configure the service**:
+   - **Build Command**: `pip install -e .`
+   - **Start Command**: `python -m wikidata_mcp.api`
+4. **Set Environment Variables**:
+   - Add all variables from `.env.example`
+   - For production, set `DEBUG=false`
+   - Make sure to set a proper `WIKIDATA_VECTORDB_API_KEY`
+5. **Deploy**
+
+The service will be available at `https://your-service-name.onrender.com`
+
+## Environment Setup
 
 ### Prerequisites
 
 - Python 3.10+
 - Virtual environment tool (venv, conda, etc.)
+- Vector DB API key (for enhanced semantic search)
 
-### Setup
+### Environment Variables
+
+Create a `.env` file in the project root with the following variables:
+
+```bash
+# Required for Vector DB integration
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/ebaenamar/wikidata-mcp.git
-   cd wikidata-mcp-server-sse
+   git clone https://github.com/yourusername/wikidata-mcp-mirror.git
+   cd wikidata-mcp-mirror
    ```
 
 2. Create and activate a virtual environment:
    ```bash
    python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   source venv/bin/activate  # On Windows: .\venv\Scripts\activate
    ```
 
-3. Install dependencies:
+3. Install the required dependencies:
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
    ```
 
-4. Run the server locally:
+4. Create a `.env` file based on `.env.example` and configure your environment variables:
    ```bash
-   python server_sse.py
+   cp .env.example .env
+   # Edit .env with your configuration
    ```
 
-   The server will start on `http://localhost:8000` by default.
+5. Run the application:
+   ```bash
+   # Development
+   python -m wikidata_mcp.api
+   
+   # Production (with Gunicorn)
+   gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout 120 --keep-alive 5 --worker-class uvicorn.workers.UvicornWorker wikidata_mcp.api:app
+   ```
 
-## Testing the Server
+   The server will start on `http://localhost:8000` by default with the following endpoints:
+   - `GET /health` - Health check
+   - `GET /messages/` - SSE endpoint for MCP communication
+   - `GET /docs` - Interactive API documentation (if enabled)
+   - `GET /metrics` - Prometheus metrics (if enabled)
 
-You can test the server using the included test client:
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | 8000 | Port to run the server on |
+| `WORKERS` | 4 | Number of worker processes |
+| `TIMEOUT` | 120 | Worker timeout in seconds |
+| `KEEPALIVE` | 5 | Keep-alive timeout in seconds |
+| `DEBUG` | false | Enable debug mode |
+| `LOG_LEVEL` | INFO | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| `USE_VECTOR_DB` | true | Enable/disable vector DB integration |
+| `USE_CACHE` | true | Enable/disable caching system |
+| `USE_FEEDBACK` | true | Enable/disable feedback system |
+| `CACHE_TTL_SECONDS` | 3600 | Cache time-to-live in seconds |
+| `CACHE_MAX_SIZE` | 1000 | Maximum number of items in cache |
+| `WIKIDATA_VECTORDB_API_KEY` | | API key for the vector DB service |
+
+### Running with Docker
+
+1. Build the Docker image:
+   ```bash
+   docker build -t wikidata-mcp .
+   ```
+
+2. Run the container:
+   ```bash
+   docker run -p 8000:8000 --env-file .env wikidata-mcp
+   ```
+
+### Running with Docker Compose
+
+1. Start the application:
+   ```bash
+   docker-compose up --build
+   ```
+
+2. For production, use the production compose file:
+   ```bash
+   docker-compose -f docker-compose.prod.yml up --build -d
+   ```
+
+## Monitoring
+
+The service exposes Prometheus metrics at `/metrics` when the `PROMETHEUS_METRICS` environment variable is set to `true`.
+
+### Health Check
+
+```bash
+curl http://localhost:8000/health
+```
+
+### Metrics
+
+```bash
+curl http://localhost:8000/metrics
+```
+
+## Testing
+
+### Running Tests
+
+Run the test suite with:
+
+```bash
+# Run all tests
+pytest
+
+# Run specific test file
+pytest tests/orchestration/test_query_orchestrator.py -v
+
+# Run with coverage report
+pytest --cov=wikidata_mcp tests/
+```
+
+### Integration Tests
+
+To test the Vector DB integration, you'll need to set the `WIKIDATA_VECTORDB_API_KEY` environment variable:
+
+```bash
+WIKIDATA_VECTORDB_API_KEY=your_key_here pytest tests/orchestration/test_vectordb_integration.py -v
+```
+
+### Test Client
+
+You can also test the server using the included test client:
 
 ```bash
 python test_mcp_client.py

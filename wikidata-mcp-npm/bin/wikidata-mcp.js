@@ -4,7 +4,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 // URL de nuestro servidor MCP en Render (oculta para los usuarios)
-const SERVER_URL = "https://wikidata-mcp.onrender.com/sse";
+const SERVER_URL = "https://wikidata-mcp-mirror.onrender.com/sse";
 
 // No imprimir mensajes que puedan confundir a Claude Desktop
 // console.log(`Connecting to Wikidata MCP Server...`);

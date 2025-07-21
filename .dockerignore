@@ -1,0 +1,107 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyd
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environment
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+!.env.example
+
+# Logs
+logs/
+*.log
+
+# Local development
+local_settings.py
+local_config.py
+
+# Test and coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Project specific
+*.db
+*.sqlite3
+
+# Cache
+.cache/
+.mypy_cache/
+.pytest_cache/
+
+# Documentation
+docs/_build/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Local development
+*.local
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Project specific exclusions
+!src/wikidata_mcp/*.py
+!src/wikidata_mcp/*.pyi
+!src/wikidata_mcp/*.so
+!src/wikidata_mcp/*.dll
+
+# Keep the source directory structure
+!src/wikidata_mcp/**/

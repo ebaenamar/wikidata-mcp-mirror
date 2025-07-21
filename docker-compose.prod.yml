@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      target: builder
+    restart: always
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    environment:
+      - PORT=${PORT:-8000}
+      - WORKERS=${WORKERS:-4}
+      - TIMEOUT=${TIMEOUT:-120}
+      - KEEPALIVE=${KEEPALIVE:-5}
+      - USE_VECTOR_DB=${USE_VECTOR_DB:-false}
+      - USE_CACHE=${USE_CACHE:-true}
+      - USE_FEEDBACK=${USE_FEEDBACK:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8000}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    # Uncomment if using Redis
+    # depends_on:
+    #   redis:
+    #     condition: service_healthy
+
+  # Uncomment and configure if you need Redis for caching
+  # redis:
+  #   image: redis:7-alpine
+  #   restart: always
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 5
+
+# Uncomment if using Redis
+# volumes:
+#   redis_data:
