@@ -29,35 +29,41 @@ A Model Context Protocol (MCP) server with Server-Sent Events (SSE) transport th
 The server is deployed and accessible at:
 
 - **URL**: [https://wikidata-mcp-mirror.onrender.com](https://wikidata-mcp-mirror.onrender.com)
-- **SSE Endpoint**: [https://wikidata-mcp-mirror.onrender.com/messages/](https://wikidata-mcp-mirror.onrender.com/messages/)
+- **MCP Endpoint**: [https://wikidata-mcp-mirror.onrender.com/mcp](https://wikidata-mcp-mirror.onrender.com/mcp)
 - **Health Check**: [https://wikidata-mcp-mirror.onrender.com/health](https://wikidata-mcp-mirror.onrender.com/health)
 
 ## Usage with Claude Desktop
 
 To use this server with Claude Desktop:
 
-1. Edit the Claude Desktop configuration file located at:
+1. **Install mcp-remote** (if not already installed):
+   ```bash
+   npm install -g @modelcontextprotocol/mcp-remote
+   ```
+
+2. Edit the Claude Desktop configuration file located at:
    ```
    ~/Library/Application Support/Claude/claude_desktop_config.json
    ```
 
-2. Configure it to use the remote MCP server:
+3. Configure it to use the remote MCP server:
    ```json
    {
      "mcpServers": {
-       "Wikidata Knowledge Remote": {
-         "command": "mcp-remote",
+       "Wikidata MCP": {
+         "command": "npx",
          "args": [
-           "https://wikidata-mcp-mirror.onrender.com/messages/"
+           "mcp-remote",
+           "https://wikidata-mcp-mirror.onrender.com/mcp"
          ]
        }
      }
    }
    ```
 
-3. Restart Claude Desktop
+4. Restart Claude Desktop
 
-4. When using Claude, you can now access Wikidata knowledge through the configured MCP server.
+5. When using Claude, you can now access Wikidata knowledge through the configured MCP server.
 
 ## Deployment
 
