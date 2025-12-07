@@ -15,22 +15,24 @@ WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
 WIKIDATA_SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
 USER_AGENT = "Wikidata MCP Server/1.0 (https://github.com/ebaenamar/wikidata-mcp; ebaenamar@gmail.com)"
 
-def search_entity(query: str) -> str:
+def search_entity(query: str, limit: int = 10) -> str:
     """
-    Search for a Wikidata entity ID by its name.
+    Search for Wikidata entities by name.
     
     Args:
         query: The search term
+        limit: Maximum number of candidates to return (default 10)
         
     Returns:
-        The Wikidata entity ID (e.g., Q937 for Albert Einstein) or an error message
+        JSON with candidates list including Q-IDs, labels, descriptions, and match count
     """
     params = {
         "action": "wbsearchentities",
         "format": "json",
         "language": "en",
         "search": query,
-        "type": "item"
+        "type": "item",
+        "limit": min(limit, 50)  # Wikidata max is 50
     }
     
     headers = {
@@ -43,9 +45,24 @@ def search_entity(query: str) -> str:
         data = response.json()
         
         if "search" in data and len(data["search"]) > 0:
-            return data["search"][0]["id"]
+            candidates = []
+            for item in data["search"]:
+                candidates.append({
+                    "qid": item.get("id"),
+                    "label": item.get("label", ""),
+                    "description": item.get("description", ""),
+                    "aliases": item.get("aliases", [])
+                })
+            
+            result = {
+                "query": query,
+                "total_candidates": len(candidates),
+                "ambiguous": len(candidates) > 1,
+                "candidates": candidates
+            }
+            return json.dumps(result)
         else:
-            return "No entity found"
+            return json.dumps({"query": query, "total_candidates": 0, "candidates": [], "ambiguous": False})
     except requests.exceptions.RequestException as e:
         return f"Error searching for entity: {str(e)}"
 

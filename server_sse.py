@@ -38,8 +38,9 @@ try:
     orchestrator = QueryOrchestrator()
     ORCHESTRATION_AVAILABLE = True
     print("Advanced orchestration available")
-except ImportError as e:
+except (ImportError, ValueError) as e:
     ORCHESTRATION_AVAILABLE = False
+    orchestrator = None
     print(f"Warning: Advanced orchestration not available: {e}")
 
 # Initialize FastMCP
@@ -48,9 +49,18 @@ mcp = FastMCP(name="Wikidata Knowledge")
 # ============= MCP TOOLS =============
 
 @mcp.tool()
-def search_wikidata_entity(query: str) -> str:
-    """Search for Wikidata entities by name or description."""
-    return search_entity(query)
+def search_wikidata_entity(query: str, limit: int = 10) -> str:
+    """
+    Search for Wikidata entities by name. Returns multiple candidates for disambiguation.
+    
+    Args:
+        query: The search term (entity name)
+        limit: Maximum candidates to return (default 10, max 50)
+    
+    Returns:
+        JSON with total_candidates, ambiguous flag, and list of candidates with qid/label/description
+    """
+    return search_entity(query, limit)
 
 @mcp.tool()
 def search_wikidata_property(query: str) -> str:
@@ -105,6 +115,81 @@ User: "Find information about Marie Curie"
 ```
 
 Always prefer basic tools for simple queries!
+"""
+
+@mcp.prompt()
+def reconciliation_guide() -> str:
+    """Guide for disambiguating entities when multiple candidates match (the 'John Smith problem')."""
+    return """
+# Wikidata Reconciliation Guide
+
+## The Problem
+When searching for common names like "John Smith", Wikidata returns many candidates.
+Your job is to help the user identify the CORRECT Q-ID for their specific entity.
+
+## Workflow
+
+### Step 1: Initial Search
+Use `search_wikidata_entity` - it returns ALL candidates with:
+- `total_candidates`: How many matches exist
+- `ambiguous`: true if multiple candidates
+- `candidates`: List with qid, label, description, aliases
+
+### Step 2: Assess Ambiguity
+```
+If total_candidates == 0: No match found, try alternative spellings
+If total_candidates == 1: High confidence match ✓
+If total_candidates > 1: DISAMBIGUATION NEEDED
+```
+
+### Step 3: Disambiguation Strategy
+When ambiguous, ask the user for additional context:
+
+**For PEOPLE, ask about:**
+- Birth/death dates
+- Occupation or profession
+- Nationality or country
+- Notable works or achievements
+
+**For PLACES, ask about:**
+- Country or region
+- Type (city, river, mountain)
+- Population or size
+
+**For ORGANIZATIONS, ask about:**
+- Type (company, university, NGO)
+- Location/headquarters
+- Industry or field
+
+### Step 4: Verify with Properties
+Use `get_wikidata_properties(qid)` to confirm the match:
+- P569 = date of birth
+- P570 = date of death  
+- P106 = occupation
+- P27 = country of citizenship
+- P19 = place of birth
+
+### Step 5: Report Confidence
+Always tell the user:
+- How many candidates were found
+- Why you selected a specific Q-ID
+- Confidence level (high/medium/low)
+
+## Example Dialogue
+
+**User**: Find John Smith the explorer
+**You**: 
+1. Search returns 47 candidates for "John Smith"
+2. Ask: "Which John Smith? I found 47 matches. Can you provide:
+   - Approximate birth year?
+   - Which country?
+   - What did they explore?"
+3. User says: "Born around 1580, English, explored Virginia"
+4. Use SPARQL to filter: explorers, English, 16th-17th century
+5. Return: Q327071 (John Smith, English explorer, 1580-1631) - HIGH confidence
+
+## Key Principle
+**Never guess when ambiguous.** Always ask for clarifying information or present the top candidates for the user to choose.
 """
 
 @mcp.prompt()
